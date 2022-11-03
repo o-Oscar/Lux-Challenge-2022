@@ -1,0 +1,13 @@
+__pycache__
+*.egg-info
+.DS_Store
+replays
+
+visualizer/src/assets/replay.json
+
+kaggle-environments
+tests/private_agents
+
+Lux-Design-2022/
+.venv/
+viewer/
