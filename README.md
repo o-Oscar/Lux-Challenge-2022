@@ -52,7 +52,7 @@ On remarque qu'un réseau de neurones qui output des Q-valeurs peut aussi output
 
 ### Pour commencer
 
-On va commencer avec un réseau de neurones qui output une distribution catégorique qui est un simple subset de toutes les actions disponnibles. On garde en tête qu'il faut mettre en place un système "d'action masking" qui empêche la sélection d'actions qui n'ont pas de sens (se déplacer à l'extérieur de la carte, transférer ou récupérer de l'énergie alors qu'il y a pas d'usine)
+On va commencer avec un réseau de neurones qui output une distribution catégorique qui est un simple subset de toutes les actions disponnibles. On garde en tête qu'il faut mettre en place un système "d'action masking" qui empêche la sélection d'actions qui n'ont pas de sens (se déplacer à l'extérieur de la carte, transférer ou récupérer de l'énergie alors qu'il y a pas d'usine, transférer alors que le robot n'a rien sur lui...)
 
 - [0] : Ne rien faire -> Ne pas envoyer d'action
 - [1-4] : Bouger d'une case
@@ -78,3 +78,42 @@ La solution générale, c'est d'utiliser un RNN (LSTM, Transformer, ...) qui out
 Une solution intermédiaire peut exploiter la structure de l'environnement : On peut se dire qu'on utlise le système de queue que pour les déplacement. Du coup quand on choisit de se déplacer, on envoit toutes les actions pour se déplacer vers la destination choisie. Par contre, pour miner ou autre, on envoit les actions une par une.
 
 Bref, c'est un peu compliqué à implémenter. Dans un premier temps, on va s'en passer.
+
+
+
+
+
+# TODO :
+
+Créer un environnement pour commencer à entraîner des trucs
+
+- [ ] Faire un wrapper qui sauvegarde l'exécution de l'environnment pour pouvoir le visualiser et réutiliser les transitions si besoin.  
+- [ ] Implémenter un placement pas trop débile des usine histoire d'avoir une chance de survie
+- [ ] Effectuer les actions demandées par l'extérieur pour chacune des unitées. Les actions sont sous la forme d'un dictionnaire avec le nom de l'unité et son action. 
+- [ ] Les usines produisent toujours des petits robots dès que possible (dans un premier temps).
+- [ ] Retourner le dictionnaire des observations des robots
+- [ ] Retourner le dictionnaire des rewards. Chaque robot à un reward à soit qu'il essait d'optimiser.
+- [ ] Retourner le dictionnaire des masks d'actions. 
+
+
+Ecrire une fonction de reward pour différents skills :
+
+- [ ] Ne pas écraser d'autres robots, mais surtout ne pas se faire écraser.
+- [ ] Aller se mettre sur une case où il y a de l'eau
+- [ ] Se charger d'eau à fond
+- [ ] Recharger les usines en eau
+- [ ] Aller se mettre sur une case où il y a du minerais
+- [ ] Se charger de minerais à fond
+- [ ] Recharger les usines en minerais
+
+
+Le RL à proprement parler :
+
+- [ ] Trouver un algo pour entraîner un nombre variable d'agents
+- [ ] Entraîner des agents à ne pas se rentrer dedans.
+- [ ] Evaluer les gains par rapport à zéro entraînement.
+- [ ] Faire un premier petit rapport
+- [ ] Entraîner des agents à se mettre sur des cases d'eau
+- [ ] Evaluer les gains par rapport à zéro entraînement
+- [ ] Evaluer les gains entre : entraîner de zéro, utilier le modèle précédent, utiliser du Q-learning pour bootstrap l'entrainement avec la nouvelle fonction de reward.
+- [ ] Faire un rapport. C'est déjà pas mal de boulot d'arriver ici. 
