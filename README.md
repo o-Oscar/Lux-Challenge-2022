@@ -32,6 +32,8 @@ Pour entraîner un skill, on a bien envie d'utiliser du RL (c'est même le but d
 
 L'intérêt d'une méthode comme ça, c'est qu'il n'est pas nécessaire de conserver toujours la même fonction de reward : on peut utiliser du Q-learning sur des trajectoires générées avec une stratégie quelconque et avec une fonction de reward quelconque. Il faudra mesurer à quel point ça nous permet d'accélérer l'apprentissage de nouveaux skills par rapport à un simple PPO sans pré-entraînement. 
 
+Bref, pour résumer, on veut avoir des unités qui, quand on les envoit quelque part, font les bonnes actions. Après, il restera à décider où les envoyer. Mais comme Stan peut l'expliquer mieux que moi, si les actions de base sont bonnes, alors si on envoit les unités un peu partout, on aura déjà une stratégie qui se débrouille bien.
+
 ## Quoi implémenter pour commencer à s'amuser
 
 Pour faire marcher du Q-learning, il va falloir sauvegarder toutes (ou une grande majorité) des parties jouées par nos agents. Il faut un moyen de savegarder proprement les parties pour pouvoir les revoir avec le viewer et pour pouvoir les charger à nouveau dans python pour les manipuler comme on veut.
@@ -47,3 +49,32 @@ Si on pousse l'analogie entre les unités du jeu et des petits robots qui se bal
 On verra ça peut-être dans un second temps mais on peut aussi ajouter un vecteur de pré-condition aua réseau de neurones pour avoir une sorte d'input qui correspondrait à un "ordre", de manière à envoyer des ordres différents à chaque unité pour les synchroniser entre elles. Ces "ordres" pourraient être donnés par un gros réseau de neurone "chef" qui a comme input toute la carte et qui donne des informations ou des ordres à chaque robot. 
 
 On remarque qu'un réseau de neurones qui output des Q-valeurs peut aussi output des probabilités en ajoutant un simple softmax. Du coup, ça nous permet d'utiliser le même réseau de neurones pour le Q-learning et pour l'apprentissage on-policy.
+
+### Pour commencer
+
+On va commencer avec un réseau de neurones qui output une distribution catégorique qui est un simple subset de toutes les actions disponnibles. On garde en tête qu'il faut mettre en place un système "d'action masking" qui empêche la sélection d'actions qui n'ont pas de sens (se déplacer à l'extérieur de la carte, transférer ou récupérer de l'énergie alors qu'il y a pas d'usine)
+
+- [0] : Ne rien faire -> Ne pas envoyer d'action
+- [1-4] : Bouger d'une case
+- [5] : Transférer de l'ice à l'usine en dessous
+- [6] : Transférer du minerais à l'usine en dessous
+- [7-9] : Récupérer 50, 100 ou 150 énergie de l'usine
+- [10] : Creuser
+
+## Problème de l'environnement
+
+En général en RL, on a un environnement qu'on ne peut pas trop modifier. En particulier, ici, c'et un peu relou de faire des sénarios qui entraînent spécifiquement un seul type de comportement des unités. Du coup, si on cherche à entraîner une unité à combattre, on doit d'abord être capable de survivre suffisement longtemps et produire suffisement de ressources et suffisement longtemps pour pouvoir envoyer des unités tester des techniques de combat.
+
+Du coup l'environnement d'entraînement sera assez compliqué : supposons qu'on cherche à entraîner le combat. Il faut alors un séquenceur qui commence par arriver au mid-game, et qui une fois au mid-game envoit quelques unités pour combattre. 
+
+Conclusion, pour chaque skill qu'on cherche à apprendre, il faut à peu près le même environnement, mais un séquenceur différent, avec une fonction de reward différente. 
+
+## Misc
+
+Il y a un système de queue d'actions qu'on peut envoyer aux unités. Utiliser ce système permet d'utiliser moins d'énergie. 
+
+La solution générale, c'est d'utiliser un RNN (LSTM, Transformer, ...) qui output exactement toutes les actions à envoyer (en vrai, c'est peut-être pas une mauvaise idée) et qui finit par output \<end> quand il a fini de choisir ses actions. 
+
+Une solution intermédiaire peut exploiter la structure de l'environnement : On peut se dire qu'on utlise le système de queue que pour les déplacement. Du coup quand on choisit de se déplacer, on envoit toutes les actions pour se déplacer vers la destination choisie. Par contre, pour miner ou autre, on envoit les actions une par une.
+
+Bref, c'est un peu compliqué à implémenter. Dans un premier temps, on va s'en passer.
