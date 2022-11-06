@@ -188,11 +188,11 @@ class Env(gym.Env):
         obs, rewards, dones, infos = self.env.step(actions)
         unit_obs = self.obs_generator.calc_obs(obs)
         action_masks = self.action_handler.calc_masks(obs)
-        # rewards = self.reward_generator.calc_rewards(self.old_obs, actions, obs)
+        rewards = self.reward_generator.calc_rewards(self.old_obs, actions, obs)
 
         self.old_obs = obs
-        # return unit_obs, rewards, action_masks
-        return unit_obs, action_masks
+        return unit_obs, rewards, action_masks
+        # return unit_obs, action_masks
 
     def save(self, **kwargs):
         return self.env.save(**kwargs)

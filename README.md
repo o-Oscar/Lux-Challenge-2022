@@ -64,7 +64,7 @@ On va commencer avec un réseau de neurones qui output une distribution catégor
 L'input du réseau de neurones va comprendre deux modalités : une grille et un vecteur. La grille contient les informations de terrain et le vecteur contient les informations du robot.
 
 - La grille a 5 channels : une channel de glace, une channel de minerais, une channel de robots, une channel d'usines et un channel de out-of bounds.
-- Le vecteur a 5 inputs : le delta de l'usine la plus proche, la quantité de glace, la quantité de minerais, la quantité d'énergie
+- Le vecteur a 7 inputs : le delta de l'usine la plus proche, la quantité de glace, la quantité de minerais, la quantité d'énergie, l'indication de l'heure en sin/cos
 
 ## Problème de l'environnement
 
@@ -98,12 +98,13 @@ Créer un environnement pour commencer à entraîner des trucs
 - [x] Effectuer les actions demandées par l'extérieur pour chacune des unitées. Les actions sont sous la forme d'un dictionnaire avec le nom de l'unité et son action. 
 - [x] Retourner le dictionnaire des observations des robots
 - [x] Retourner le dictionnaire des masks d'actions. 
-- [ ] Retourner le dictionnaire des rewards. Chaque robot à un reward à soit qu'il essait d'optimiser.
+- [x] Retourner le dictionnaire des rewards. Chaque robot à un reward à soit qu'il essait d'optimiser.
 - [ ] Implémenter un meilleur placement des usine pour augmenter les chances de survie
 
 
 Ecrire une fonction de reward pour différents skills :
 
+- [x] Ne pas rester sur les cases de spawn, mais surtout ne pas se faire écraser.
 - [ ] Ne pas écraser d'autres robots, mais surtout ne pas se faire écraser.
 - [ ] Aller se mettre sur une case où il y a de l'eau
 - [ ] Se charger d'eau à fond

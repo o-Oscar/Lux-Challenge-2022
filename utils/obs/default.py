@@ -9,7 +9,7 @@ OBS_GRID_CHANNELS = 4
 
 OBS_GRID_SHAPE = (OBS_GRID_CHANNELS, OBS_GRID_SIZE, OBS_GRID_SIZE)
 
-OBS_VECTOR_LEN = 5
+OBS_VECTOR_LEN = 7
 
 
 def expand_grid(grid):
@@ -78,6 +78,8 @@ class DefaultObsGenerator(ObsGenerator):
                 vector[2] = unit["cargo"]["ice"] / 100
                 vector[3] = unit["cargo"]["ore"] / 100
                 vector[4] = unit["power"] / 150
+                vector[5] = np.sin(np.pi * 2 * obs[team]["real_env_steps"] / 50)
+                vector[6] = np.cos(np.pi * 2 * obs[team]["real_env_steps"] / 50)
 
                 to_return[team][unit_name] = {"grid": grid, "vector": vector}
 
