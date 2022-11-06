@@ -10,8 +10,10 @@ import pickle
 import time
 import luxai2022.config
 import luxai2022.state
-from utils.obs import calc_unit_obs
 from utils import teams
+from utils.obs.default import DefaultObsGenerator
+from utils.action.default import DefaultActionHandler
+from utils.reward.default import DefaultRewardGenerator
 
 DEFAULT_LOG_PATH = Path("results/logs/")
 
@@ -96,19 +98,9 @@ class Env(gym.Env):
 
         self.env = LogWrapper(luxai2022.LuxAI2022())
 
-        self.robot_to_env_actions = [
-            None,  # ne rien faire
-            np.array([0, 1, 0, 0, 0]),  # bouger en haut
-            np.array([0, 2, 0, 0, 0]),  # bouger à droite
-            np.array([0, 3, 0, 0, 0]),  # bouger en bas
-            np.array([0, 4, 0, 0, 0]),  # bouger à gauche
-            np.array([1, 0, 0, 100, 0]),  # transférer de la glace
-            np.array([1, 0, 1, 100, 0]),  # transférer des minerais
-            np.array([2, 0, 4, 50, 0]),  # transférer des minerais
-            np.array([2, 0, 4, 100, 0]),  # transférer des minerais
-            np.array([2, 0, 4, 150, 0]),  # transférer des minerais
-            np.array([3, 0, 0, 0, 0]),  # creuser
-        ]
+        self.obs_generator = DefaultObsGenerator()
+        self.action_handler = DefaultActionHandler()
+        self.reward_generator = DefaultRewardGenerator()
 
     def reset(self):
 
@@ -150,7 +142,9 @@ class Env(gym.Env):
         # turn 0 : creating robots for each team
         obs, rewards, dones, infos = self.env.step(self.factory_actions())
 
-        unit_obs = calc_unit_obs(obs)
+        unit_obs = self.obs_generator.calc_obs(obs)
+        self.old_obs = obs
+
         return unit_obs
 
     def factory_actions(self):
@@ -179,20 +173,26 @@ class Env(gym.Env):
 
         return actions
 
-    def add_robots_actions(self, action_dict, robots_actions):
-        for team in teams:
-            for unit_name, unit in self.env.state.units[team].items():
-                cur_action = self.robot_to_env_actions[robots_actions[team][unit_name]]
-                if cur_action is not None:
-                    action_dict[team][unit_name] = cur_action
+    def fuse_actions(self, *action_dicts):
+        to_return = {team: {} for team in teams}
+        for action_dict in action_dicts:
+            for team in teams:
+                to_return[team].update(action_dict[team])
+        return to_return
 
     def step(self, a):
-        actions = self.factory_actions()
-        self.add_robots_actions(actions, a)
+        factory_actions = self.factory_actions()
+        units_actions = self.action_handler.network_to_robots(a)
+        actions = self.fuse_actions(factory_actions, units_actions)
 
         obs, rewards, dones, infos = self.env.step(actions)
-        unit_obs = calc_unit_obs(obs)
-        return unit_obs, rewards, dones, infos
+        unit_obs = self.obs_generator.calc_obs(obs)
+        action_masks = self.action_handler.calc_masks(obs)
+        # rewards = self.reward_generator.calc_rewards(self.old_obs, actions, obs)
+
+        self.old_obs = obs
+        # return unit_obs, rewards, action_masks
+        return unit_obs, action_masks
 
     def save(self, **kwargs):
         return self.env.save(**kwargs)

@@ -97,8 +97,8 @@ Créer un environnement pour commencer à entraîner des trucs
 - [x] Les usines produisent toujours des petits robots dès que possible (dans un premier temps).
 - [x] Effectuer les actions demandées par l'extérieur pour chacune des unitées. Les actions sont sous la forme d'un dictionnaire avec le nom de l'unité et son action. 
 - [x] Retourner le dictionnaire des observations des robots
+- [x] Retourner le dictionnaire des masks d'actions. 
 - [ ] Retourner le dictionnaire des rewards. Chaque robot à un reward à soit qu'il essait d'optimiser.
-- [ ] Retourner le dictionnaire des masks d'actions. 
 - [ ] Implémenter un meilleur placement des usine pour augmenter les chances de survie
 
 
