@@ -46,7 +46,7 @@ Il faut réfléchir deux secondes à l'organisation du code. On va utiliser des 
 
 Si on pousse l'analogie entre les unités du jeu et des petits robots qui se balladent sur Mars, on a envie de donner à chaque unité le même réseau de neurone. Chaque unité reçoit des inputs centrés sur sa position (la topologie locale du terrain, sa distance aux différentes usines, son stock de ressources, ...) et utilise son réseau de neurone (dont les poids sont partagés) pour choisir ses actions. 
 
-On verra ça peut-être dans un second temps mais on peut aussi ajouter un vecteur de pré-condition aua réseau de neurones pour avoir une sorte d'input qui correspondrait à un "ordre", de manière à envoyer des ordres différents à chaque unité pour les synchroniser entre elles. Ces "ordres" pourraient être donnés par un gros réseau de neurone "chef" qui a comme input toute la carte et qui donne des informations ou des ordres à chaque robot. 
+On verra ça peut-être dans un second temps mais on peut aussi ajouter un vecteur de pré-condition au réseau de neurones pour avoir une sorte d'input qui correspondrait à un "ordre", de manière à envoyer des ordres différents à chaque unité pour les synchroniser entre elles. Ces "ordres" pourraient être donnés par un gros réseau de neurone "chef" qui a comme input toute la carte et qui donne des informations ou des ordres à chaque robot. 
 
 On remarque qu'un réseau de neurones qui output des Q-valeurs peut aussi output des probabilités en ajoutant un simple softmax. Du coup, ça nous permet d'utiliser le même réseau de neurones pour le Q-learning et pour l'apprentissage on-policy.
 
@@ -60,6 +60,11 @@ On va commencer avec un réseau de neurones qui output une distribution catégor
 - [6] : Transférer du minerais à l'usine en dessous
 - [7-9] : Récupérer 50, 100 ou 150 énergie de l'usine
 - [10] : Creuser
+
+L'input du réseau de neurones va comprendre deux modalités : une grille et un vecteur. La grille contient les informations de terrain et le vecteur contient les informations du robot.
+
+- La grille a 5 channels : une channel de glace, une channel de minerais, une channel de robots, une channel d'usines et un channel de out-of bounds.
+- Le vecteur a 5 inputs : le delta de l'usine la plus proche, la quantité de glace, la quantité de minerais, la quantité d'énergie
 
 ## Problème de l'environnement
 
@@ -88,10 +93,10 @@ Bref, c'est un peu compliqué à implémenter. Dans un premier temps, on va s'en
 Créer un environnement pour commencer à entraîner des trucs
 
 - [x] Faire un wrapper qui sauvegarde l'exécution de l'environnment pour pouvoir le visualiser et réutiliser les transitions si besoin.  
-- [X] Implémenter un placement pas trop débile des usine histoire d'avoir une chance de survie
-- [X] Les usines produisent toujours des petits robots dès que possible (dans un premier temps).
-- [X] Effectuer les actions demandées par l'extérieur pour chacune des unitées. Les actions sont sous la forme d'un dictionnaire avec le nom de l'unité et son action. 
-- [ ] Retourner le dictionnaire des observations des robots
+- [x] Implémenter un placement pas trop débile des usine histoire d'avoir une chance de survie
+- [x] Les usines produisent toujours des petits robots dès que possible (dans un premier temps).
+- [x] Effectuer les actions demandées par l'extérieur pour chacune des unitées. Les actions sont sous la forme d'un dictionnaire avec le nom de l'unité et son action. 
+- [x] Retourner le dictionnaire des observations des robots
 - [ ] Retourner le dictionnaire des rewards. Chaque robot à un reward à soit qu'il essait d'optimiser.
 - [ ] Retourner le dictionnaire des masks d'actions. 
 - [ ] Implémenter un meilleur placement des usine pour augmenter les chances de survie

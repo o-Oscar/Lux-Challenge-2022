@@ -10,7 +10,8 @@ import pickle
 import time
 import luxai2022.config
 import luxai2022.state
-
+from utils.obs import calc_unit_obs
+from utils import teams
 
 DEFAULT_LOG_PATH = Path("results/logs/")
 
@@ -94,7 +95,6 @@ class Env(gym.Env):
         self.action_space = spaces.Discrete(6)
 
         self.env = LogWrapper(luxai2022.LuxAI2022())
-        self.teams = ["player_0", "player_1"]
 
         self.robot_to_env_actions = [
             None,  # ne rien faire
@@ -126,7 +126,7 @@ class Env(gym.Env):
         n_factories = obs["player_0"]["board"]["factories_per_team"]
         for i in range(n_factories):
             actions = {}
-            for team in self.teams:
+            for team in teams:
                 spawns = obs[team]["board"]["spawns"][team]
                 m, M = np.min(spawns, axis=0), np.max(spawns, axis=0)
                 delta = M - m
@@ -148,7 +148,10 @@ class Env(gym.Env):
         self.env.step({"player_0": {}, "player_1": {}})
 
         # turn 0 : creating robots for each team
-        self.env.step(self.factory_actions())
+        obs, rewards, dones, infos = self.env.step(self.factory_actions())
+
+        unit_obs = calc_unit_obs(obs)
+        return unit_obs
 
     def factory_actions(self):
         """
@@ -166,7 +169,7 @@ class Env(gym.Env):
         else:
             power_fac = 1
 
-        for team in self.teams:
+        for team in teams:
             for factory_name, factory in self.env.state.factories[team].items():
                 if (
                     factory.power >= light_config.POWER_COST * power_fac
@@ -177,7 +180,7 @@ class Env(gym.Env):
         return actions
 
     def add_robots_actions(self, action_dict, robots_actions):
-        for team in self.teams:
+        for team in teams:
             for unit_name, unit in self.env.state.units[team].items():
                 cur_action = self.robot_to_env_actions[robots_actions[team][unit_name]]
                 if cur_action is not None:
@@ -188,7 +191,8 @@ class Env(gym.Env):
         self.add_robots_actions(actions, a)
 
         obs, rewards, dones, infos = self.env.step(actions)
-        return obs, rewards, dones, infos
+        unit_obs = calc_unit_obs(obs)
+        return unit_obs, rewards, dones, infos
 
     def save(self, **kwargs):
         return self.env.save(**kwargs)
