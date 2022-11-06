@@ -87,13 +87,14 @@ Bref, c'est un peu compliqué à implémenter. Dans un premier temps, on va s'en
 
 Créer un environnement pour commencer à entraîner des trucs
 
-- [ ] Faire un wrapper qui sauvegarde l'exécution de l'environnment pour pouvoir le visualiser et réutiliser les transitions si besoin.  
-- [ ] Implémenter un placement pas trop débile des usine histoire d'avoir une chance de survie
-- [ ] Effectuer les actions demandées par l'extérieur pour chacune des unitées. Les actions sont sous la forme d'un dictionnaire avec le nom de l'unité et son action. 
-- [ ] Les usines produisent toujours des petits robots dès que possible (dans un premier temps).
+- [x] Faire un wrapper qui sauvegarde l'exécution de l'environnment pour pouvoir le visualiser et réutiliser les transitions si besoin.  
+- [X] Implémenter un placement pas trop débile des usine histoire d'avoir une chance de survie
+- [X] Les usines produisent toujours des petits robots dès que possible (dans un premier temps).
+- [X] Effectuer les actions demandées par l'extérieur pour chacune des unitées. Les actions sont sous la forme d'un dictionnaire avec le nom de l'unité et son action. 
 - [ ] Retourner le dictionnaire des observations des robots
 - [ ] Retourner le dictionnaire des rewards. Chaque robot à un reward à soit qu'il essait d'optimiser.
 - [ ] Retourner le dictionnaire des masks d'actions. 
+- [ ] Implémenter un meilleur placement des usine pour augmenter les chances de survie
 
 
 Ecrire une fonction de reward pour différents skills :
