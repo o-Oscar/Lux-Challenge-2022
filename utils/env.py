@@ -87,16 +87,17 @@ class LogWrapper(gym.Wrapper):
 
 class Env(gym.Env):
     def __init__(self):
-        self.observation_shape = (2 * 3,)
-        self.observation_space = spaces.Box(
-            low=-np.ones(self.observation_shape),
-            high=np.ones(self.observation_shape),
-            dtype=np.float32,
-        )
+        # self.observation_shape = (2 * 3,)
+        # self.observation_space = spaces.Box(
+        #     low=-np.ones(self.observation_shape),
+        #     high=np.ones(self.observation_shape),
+        #     dtype=np.float32,
+        # )
+        self.grid_observation_shape = ()
 
         self.action_space = spaces.Discrete(6)
 
-        self.env = LogWrapper(luxai2022.LuxAI2022())
+        self.env = LogWrapper(luxai2022.LuxAI2022(validate_action_space=False))
 
         self.obs_generator = DefaultObsGenerator()
         self.action_handler = DefaultActionHandler()
@@ -143,9 +144,10 @@ class Env(gym.Env):
         obs, rewards, dones, infos = self.env.step(self.factory_actions())
 
         unit_obs = self.obs_generator.calc_obs(obs)
+        action_masks = self.action_handler.calc_masks(obs)
         self.old_obs = obs
 
-        return unit_obs
+        return unit_obs, action_masks
 
     def factory_actions(self):
         """
@@ -186,12 +188,14 @@ class Env(gym.Env):
         actions = self.fuse_actions(factory_actions, units_actions)
 
         obs, rewards, dones, infos = self.env.step(actions)
+        done = dones["player_0"] or dones["player_1"]
+
         unit_obs = self.obs_generator.calc_obs(obs)
         action_masks = self.action_handler.calc_masks(obs)
         rewards = self.reward_generator.calc_rewards(self.old_obs, actions, obs)
 
         self.old_obs = obs
-        return unit_obs, rewards, action_masks
+        return unit_obs, rewards, action_masks, done
         # return unit_obs, action_masks
 
     def save(self, **kwargs):
@@ -206,5 +210,5 @@ class Env(gym.Env):
         return self.env.env_cfg
 
 
-def get_env():
+def get_env() -> Env:
     return Env()

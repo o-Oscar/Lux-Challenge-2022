@@ -34,6 +34,14 @@ class DefaultRewardGenerator:
                     if factory_grid[unit["pos"][1], unit["pos"][0]] == 1:
                         cur_reward += ON_SPAWN_REWARD
 
+                # # the unit has gone to the right
+                # cur_reward = 0
+                # if unit_id in actions[team]:
+                #     if np.array_equal(
+                #         actions[team][unit_id], np.array([0, 1, 0, 0, 0])
+                #     ):
+                #         cur_reward += 1
+
                 to_return[team][unit_id] = cur_reward
 
         return to_return

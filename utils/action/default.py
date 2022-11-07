@@ -21,6 +21,8 @@ class DefaultActionHandler(ActionHandler):
             np.array([3, 0, 0, 0, 0]),  # creuser
         ]
 
+        self.action_nb = len(self.robot_to_env_actions)
+
     def calc_masks(self, obs):
 
         to_return = {team: {} for team in teams}
@@ -67,7 +69,7 @@ class DefaultActionHandler(ActionHandler):
                     mask[7] = 0
                     mask[8] = 0
                     mask[9] = 0
-                # digging not possible when not on top of a square with rubble, ice or ore
+                # digging not possible when on top of factory or not on top of a square with rubble, ice or ore
                 if (
                     obs[team]["board"]["ice"][unit["pos"][1], unit["pos"][0]] == 0
                     and obs[team]["board"]["ore"][unit["pos"][1], unit["pos"][0]] == 0
@@ -75,6 +77,8 @@ class DefaultActionHandler(ActionHandler):
                     == 0
                 ):
                     mask[10] = 0
+                if factory_mask[unit["pos"][1], unit["pos"][0]] == 1:
+                    mask[7] = 1
 
                 to_return[team][unit_name] = mask
 
