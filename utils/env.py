@@ -98,7 +98,9 @@ class Env(gym.Env):
 
         self.action_space = spaces.Discrete(6)
 
-        self.env = LogWrapper(luxai2022.LuxAI2022(validate_action_space=False))
+        self.env = LogWrapper(
+            luxai2022.LuxAI2022(validate_action_space=False, verbose=0)
+        )
 
         self.obs_generator = DefaultObsGenerator()
         self.action_handler = DefaultActionHandler()

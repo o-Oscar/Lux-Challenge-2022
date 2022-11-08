@@ -14,6 +14,7 @@ from utils.env import get_env, Env
 from utils import teams
 import itertools
 import wandb
+from pathlib import Path
 
 
 # args.batch_size = int(args.num_envs * args.num_steps)
@@ -89,6 +90,19 @@ class Agent(nn.Module):
             self.critic(self.critic_backbone(obs)).view(-1),
         )
 
+    def get_greedy_action(self, obs, masks, action=None):
+        logits = self.actor(self.act_backbone(obs))
+        logits = logits - BIG_NUMBER * (1 - masks)
+        probs = Categorical(logits=logits)
+        if action is None:
+            action = th.argmax(logits, dim=-1)
+        return (
+            action,
+            probs.log_prob(action),
+            probs.entropy(),
+            self.critic(self.critic_backbone(obs)).view(-1),
+        )
+
 
 def obs_to_network(obs, device):
     grids = []
@@ -130,7 +144,7 @@ def actions_to_env(network_actions, obs):
     return to_return
 
 
-def multi_agent_rollout(env: Env, agent: Agent, max_ep_len=1100):
+def multi_agent_rollout(env: Env, agent: Agent, device, max_ep_len=1100):
     obs, masks = env.reset()
 
     all_obs = [obs]
@@ -204,7 +218,7 @@ class ReplayBuffer:
         self.all_values = []
 
         while len(self) < batch_size:
-            self.expand(multi_agent_rollout(env, agent))
+            self.expand(multi_agent_rollout(self.env, self.agent, self.device))
 
     def expand(self, rollout):
         for team in teams:
@@ -331,16 +345,6 @@ class ReplayBuffer:
         )
 
 
-batch_size = 16
-mini_batch_size = 4
-
-clip_coef = 0.1
-norm_adv = True
-ent_coef = 0
-vf_coef = 1
-max_grad_norm = 0.5
-
-
 class MeanLogger:
     def __init__(self):
         self.reset()
@@ -358,7 +362,21 @@ class MeanLogger:
         return self.sum / self.n
 
 
+batch_size = 16
+mini_batch_size = 4
+
+clip_coef = 0.1
+norm_adv = True
+ent_coef = 0
+vf_coef = 1
+max_grad_norm = 0.5
+
+save_path = Path("results/models/survivor")
+save_path.mkdir(exist_ok=True, parents=True)
+
+
 USE_WANDB = True
+SAVE_MODEL = True
 
 if __name__ == "__main__":
     device = th.device("cuda" if th.cuda.is_available() else "cpu")
@@ -388,6 +406,13 @@ if __name__ == "__main__":
 
     for update in range(10000):
 
+        start_time = time.time()
+        print("Update {} | Trajs computation ".format(update), end="", flush=True)
+
+        if (update) % 10 == 0 and SAVE_MODEL:
+            model_name = "{:04d}".format(update)
+            th.save(agent.state_dict(), save_path / model_name)
+
         value_loss.reset()
         policy_loss.reset()
         entropy_logger.reset()
@@ -398,6 +423,8 @@ if __name__ == "__main__":
         mean_ratio.reset()
 
         buffer.fill(batch_size)
+
+        print("| Learning ", end="", flush=True)
 
         for epoch in range(4):
             for obs_g, obs_v, act, logprob, gae, masks, rets in buffer.sample(
@@ -473,7 +500,8 @@ if __name__ == "__main__":
 
         to_log["main/value_loss"] = value_loss.value
         to_log["infos/policy_loss"] = policy_loss.value
-        to_log["infos/old_approx_kl"] = old_approx_kl_logger.value
+        to_log["infos/policy_loss"] = policy_loss.value
+        to_log["infos/entropy"] = entropy_logger.value
         to_log["infos/approx_kl"] = approx_kl_logger.value
         to_log["infos/clipfrac"] = clipfrac_logger.value
         to_log["infos/explained_variance"] = explained_variance.value
@@ -484,6 +512,6 @@ if __name__ == "__main__":
         if USE_WANDB:
             wandb.log(to_log)
 
-        # th.save(agent.state_dict(), "test_model")
+        print("| Done ({:.03f}s)".format(time.time() - start_time))
 
     env.close()
