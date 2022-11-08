@@ -42,8 +42,9 @@ class LogWrapper(gym.Wrapper):
         return obs, rewards, dones, infos
 
     def reset(self, **kwargs):
-        if self.compressed_log or self.full_log:
-            self.save()
+        # TODO : find a way to dissable this usefull feature
+        # if self.compressed_log or self.full_log:
+        #     self.save()
 
         obs = self.env.reset()
 
