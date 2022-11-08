@@ -119,7 +119,7 @@ Le RL à proprement parler :
 - [x] Trouver un algo pour entraîner un nombre variable d'agents
 - [x] Entraîner des agents à ne pas se rentrer dedans.
 - [x] Evaluer les gains par rapport à zéro entraînement.
-- [ ] Faire un premier petit rapport
+- [x] Faire un premier petit rapport
 - [ ] Entraîner des agents à se mettre sur des cases d'eau
 - [ ] Evaluer les gains par rapport à zéro entraînement
 - [ ] Evaluer les gains entre : entraîner de zéro, utilier le modèle précédent, utiliser du Q-learning pour bootstrap l'entrainement avec la nouvelle fonction de reward.
