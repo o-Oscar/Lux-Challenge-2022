@@ -42,7 +42,28 @@ Il va falloir se creuser la tête pour réussir à faire rentrer notre problème
 
 Il faut réfléchir deux secondes à l'organisation du code. On va utiliser des gros bouts de code à plein d'endroits différents (environements standards, fonctions de reward, découpage des observations vers les différents agents, ...). Il faut qu'on sache facilement où est chaque bout de code et il faut pas qu'on re-code 30 fois les mêmes choses.
 
-## Représentation d'une stratégie par réseaux de neurones
+
+## Problème de l'environnement
+
+En général en RL, on a un environnement qu'on ne peut pas trop modifier. En particulier, ici, c'et un peu relou de faire des sénarios qui entraînent spécifiquement un seul type de comportement des unités. Du coup, si on cherche à entraîner une unité à combattre, on doit d'abord être capable de survivre suffisement longtemps et produire suffisement de ressources et suffisement longtemps pour pouvoir envoyer des unités tester des techniques de combat.
+
+Du coup l'environnement d'entraînement sera assez compliqué : supposons qu'on cherche à entraîner le combat. Il faut alors un séquenceur qui commence par arriver au mid-game, et qui une fois au mid-game envoit quelques unités pour combattre. 
+
+Conclusion, pour chaque skill qu'on cherche à apprendre, il faut à peu près le même environnement, mais un séquenceur différent, avec une fonction de reward différente. 
+
+## Misc
+
+Il y a un système de queue d'actions qu'on peut envoyer aux unités. Utiliser ce système permet d'utiliser moins d'énergie. 
+
+La solution générale, c'est d'utiliser un RNN (LSTM, Transformer, ...) qui output exactement toutes les actions à envoyer (en vrai, c'est peut-être pas une mauvaise idée) et qui finit par output \<end> quand il a fini de choisir ses actions. 
+
+Une solution intermédiaire peut exploiter la structure de l'environnement : On peut se dire qu'on utlise le système de queue que pour les déplacement. Du coup quand on choisit de se déplacer, on envoit toutes les actions pour se déplacer vers la destination choisie. Par contre, pour miner ou autre, on envoit les actions une par une.
+
+Bref, c'est un peu compliqué à implémenter. Dans un premier temps, on va s'en passer.
+
+# Approche "un robot un réseau"
+
+## Représentation d'une stratégie avec un réseaux de neurones par petit robot
 
 Si on pousse l'analogie entre les unités du jeu et des petits robots qui se balladent sur Mars, on a envie de donner à chaque unité le même réseau de neurone. Chaque unité reçoit des inputs centrés sur sa position (la topologie locale du terrain, sa distance aux différentes usines, son stock de ressources, ...) et utilise son réseau de neurone (dont les poids sont partagés) pour choisir ses actions. 
 
@@ -66,46 +87,44 @@ L'input du réseau de neurones va comprendre deux modalités : une grille et un 
 - La grille a 5 channels : une channel de glace, une channel de minerais, une channel de robots, une channel d'usines et un channel de out-of bounds.
 - Le vecteur a 7 inputs : le delta de l'usine la plus proche, la quantité de glace, la quantité de minerais, la quantité d'énergie, l'indication de l'heure en sin/cos
 
-## Problème de l'environnement
+## resultats
 
-En général en RL, on a un environnement qu'on ne peut pas trop modifier. En particulier, ici, c'et un peu relou de faire des sénarios qui entraînent spécifiquement un seul type de comportement des unités. Du coup, si on cherche à entraîner une unité à combattre, on doit d'abord être capable de survivre suffisement longtemps et produire suffisement de ressources et suffisement longtemps pour pouvoir envoyer des unités tester des techniques de combat.
+Avec une loss simple (un -1 si le robot meurt à ce tour), les robots apprennent bien à ne pas mourir.
 
-Du coup l'environnement d'entraînement sera assez compliqué : supposons qu'on cherche à entraîner le combat. Il faut alors un séquenceur qui commence par arriver au mid-game, et qui une fois au mid-game envoit quelques unités pour combattre. 
+Par contre il y a un soucis : Il y a au moins trois usine par team et 10 robot par usine, ça fait 60 robot en tout **dès le début de la partie**. Si chaque robot observe une zone de 11 par 11, soit 121 pixel par robot, ça veut dire qu'on doit processer $N_{obs} = 7260$ pixels à chaque tour. On peut comparer ça aux $N_{grid} = 48*48 = 2304$ pixels qu'on doit processer si on fait un gros réseau de neurone qui prend toute la map en entrée. Il faut aussi noter qu'au cours de la partie, on va probablement créer beaucoup plus de robots. Le déséquilibre entre ces deux $N$ va augmenter.
 
-Conclusion, pour chaque skill qu'on cherche à apprendre, il faut à peu près le même environnement, mais un séquenceur différent, avec une fonction de reward différente. 
+Bref, l'idée d'avoir un réseau de neurone par robot devient assez tendue dès qu'on commence à avoir beaucoup de robots (ce qui est le cas ici). On va donc changer de méthode de représentation des stratégies par réseau de neurones.
 
-## Misc
+# Approche convolutionelle
 
-Il y a un système de queue d'actions qu'on peut envoyer aux unités. Utiliser ce système permet d'utiliser moins d'énergie. 
+## Pourquoi un réseau totalement convolutionnel
 
-La solution générale, c'est d'utiliser un RNN (LSTM, Transformer, ...) qui output exactement toutes les actions à envoyer (en vrai, c'est peut-être pas une mauvaise idée) et qui finit par output \<end> quand il a fini de choisir ses actions. 
+Comme on vient de le voir, c'est une mauvaise idée d'utiliser des réseaux de neurones complêtement séparés pour chaque robot. 
 
-Une solution intermédiaire peut exploiter la structure de l'environnement : On peut se dire qu'on utlise le système de queue que pour les déplacement. Du coup quand on choisit de se déplacer, on envoit toutes les actions pour se déplacer vers la destination choisie. Par contre, pour miner ou autre, on envoit les actions une par une.
+La technique qu'on cherche à trouver doit donc pouvoir utiliser de manière efficace la représentation sous forme d'image de la map, et ne doit pas nous laisser copier 100 fois les mêmes données pour calculer les actions des robots. 
 
-Bref, c'est un peu compliqué à implémenter. Dans un premier temps, on va s'en passer.
+Une approche qu'on peut donc défendre, qui concerve la possibilité de gérer un nombre variable de robots, et qui concerve aussi un degré de localité, c'est d'utiliser des réseaux de neurones totalemet convolutionnels : c'est comme si on appliquait un réseau de neurone pour chaque position de la map qui nous intéresse. Chaque robot se fait bien dicter ses actions par un réseau de neurone dont les poids sont partagés (les matrices de convolution) mais dont les observations sont locales. 
 
+On peut voir trois soucis à cette approche. Le premier survient au début de l'aprentissage : quand tous les robots meurent et qu'il n'en reste que 4 ou 5 sur la carte, on calcule quand même les convolutions pour toute la carte, ce qui peut être vu comme une perte de temps. Cependant, ce problème disparaît dès que l'on a suffisemment de robots sur la carte (ce qui arrive assez vite, comme on l'a vu). 
 
+Le deuxième soucis peut se trouver dans la représentation de l'état du jeu. On sait que chaque robot doit avoir accès à son état local (son cargo, sa quantité d'énergie, ...). Toutes ces informations doivent être mises dans des channels indépendantes de l'image de départ, ce qui créé une représentation très sparse de l'état du jeu. Encore une fois, ce problème disparaît quand la carte commence à être pleine de robots.
 
+Enfin le dernier soucis est un soucis pratique d'implémentation : Quand chaque robot process se observations de manière indépendante, on peut envoyer à PPO des batchs avec des observations de timesteps différents. Mais si on doit utiliser un réseau de neurone sur toute la carte pour trouver les actions des robots pour un timestep, alors on est obligé d'envoyer toutes les infos d'un (ou plusieurs) timestep en même temps à PPO pour qu'il puisse travailler.
 
 
 # TODO :
 
 Créer un environnement pour commencer à entraîner des trucs
 
-- [x] Faire un wrapper qui sauvegarde l'exécution de l'environnment pour pouvoir le visualiser et réutiliser les transitions si besoin.  
-- [x] Implémenter un placement pas trop débile des usine histoire d'avoir une chance de survie
-- [x] Les usines produisent toujours des petits robots dès que possible (dans un premier temps).
-- [x] Effectuer les actions demandées par l'extérieur pour chacune des unitées. Les actions sont sous la forme d'un dictionnaire avec le nom de l'unité et son action. 
-- [x] Retourner le dictionnaire des observations des robots
-- [x] Retourner le dictionnaire des masks d'actions. 
-- [x] Retourner le dictionnaire des rewards. Chaque robot à un reward à soit qu'il essait d'optimiser.
-- [ ] Implémenter un meilleur placement des usine pour augmenter les chances de survie
-
+- [ ] Retourner la carte d'observation.
+- [ ] Retourner la map de mask d'actions (une par team). 
+- [ ] Retourner la map de rewards (une par team). Les rewards sont distribués sur les cases des robots à l'observation de départ
 
 Ecrire une fonction de reward pour différents skills :
 
-- [x] Ne pas rester sur les cases de spawn, mais surtout ne pas se faire écraser.
+- [ ] Ne pas rester sur les cases de spawn, mais surtout ne pas se faire écraser.
 - [ ] Ne pas écraser d'autres robots, mais surtout ne pas se faire écraser.
+- [ ] Ne pas écraser les robots alliés, mais écraser les robots adverses !!
 - [ ] Aller se mettre sur une case où il y a de l'eau
 - [ ] Se charger d'eau à fond
 - [ ] Recharger les usines en eau
@@ -116,10 +135,11 @@ Ecrire une fonction de reward pour différents skills :
 
 Le RL à proprement parler :
 
-- [x] Trouver un algo pour entraîner un nombre variable d'agents
-- [x] Entraîner des agents à ne pas se rentrer dedans.
-- [x] Evaluer les gains par rapport à zéro entraînement.
-- [x] Faire un premier petit rapport
+- [ ] Recoder un algo pour entraîner des agents sur une grille
+- [ ] Entraîner des agents à ne pas se rentrer dedans.
+- [ ] Entraîner des agents à se faire la guerre.
+- [ ] Evaluer les gains par rapport à zéro entraînement.
+- [ ] Faire un premier petit rapport
 - [ ] Entraîner des agents à se mettre sur des cases d'eau
 - [ ] Evaluer les gains par rapport à zéro entraînement
 - [ ] Evaluer les gains entre : entraîner de zéro, utilier le modèle précédent, utiliser du Q-learning pour bootstrap l'entrainement avec la nouvelle fonction de reward.
