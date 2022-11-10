@@ -116,6 +116,7 @@ Enfin le dernier soucis est un soucis pratique d'implémentation : Quand chaque 
 
 Créer un environnement pour commencer à entraîner des trucs
 
+- [ ] Faire le ménage quand nécessaire
 - [ ] Retourner la carte d'observation.
 - [ ] Retourner la map de mask d'actions (une par team). 
 - [ ] Retourner la map de rewards (une par team). Les rewards sont distribués sur les cases des robots à l'observation de départ
