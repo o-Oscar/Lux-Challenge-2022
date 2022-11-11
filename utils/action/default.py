@@ -14,10 +14,10 @@ class DefaultActionHandler(ActionHandler):
             np.array([0, 3, 0, 0, 0]),  # bouger en bas
             np.array([0, 4, 0, 0, 0]),  # bouger à gauche
             np.array([1, 0, 0, 100, 0]),  # transférer de la glace
-            np.array([1, 0, 1, 100, 0]),  # transférer des minerais
-            np.array([2, 0, 4, 50, 0]),  # transférer des minerais
-            np.array([2, 0, 4, 100, 0]),  # transférer des minerais
-            np.array([2, 0, 4, 150, 0]),  # transférer des minerais
+            np.array([1, 0, 1, 100, 0]),  # transférer des minerais [pourquoi que 100 et pas aussi 50 et 150 comme la réception ?]
+            np.array([2, 0, 4, 50, 0]),  # transférer des minerais [réception ici non ?][pourquoi pas simplement un np.array([2, 0, 4, x, 0]) ?]
+            np.array([2, 0, 4, 100, 0]),  # transférer des minerais [idem]
+            np.array([2, 0, 4, 150, 0]),  # transférer des minerais [idem]
             np.array([3, 0, 0, 0, 0]),  # creuser
         ]
 
