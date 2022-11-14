@@ -14,10 +14,10 @@ class DefaultActionHandler(ActionHandler):
             np.array([0, 3, 0, 0, 0]),  # bouger en bas
             np.array([0, 4, 0, 0, 0]),  # bouger à gauche
             np.array([1, 0, 0, 100, 0]),  # transférer de la glace
-            np.array([1, 0, 1, 100, 0]),  # transférer des minerais [pourquoi que 100 et pas aussi 50 et 150 comme la réception ?]
-            np.array([2, 0, 4, 50, 0]),  # transférer des minerais [réception ici non ?][pourquoi pas simplement un np.array([2, 0, 4, x, 0]) ?]
-            np.array([2, 0, 4, 100, 0]),  # transférer des minerais [idem]
-            np.array([2, 0, 4, 150, 0]),  # transférer des minerais [idem]
+            np.array([1, 0, 1, 100, 0]),  # transférer des minerais
+            np.array([2, 0, 4, 50, 0]),  # récupérer de la puissance
+            np.array([2, 0, 4, 100, 0]),  # récupérer de la puissance
+            np.array([2, 0, 4, 150, 0]),  # récupérer de la puissance
             np.array([3, 0, 0, 0, 0]),  # creuser
         ]
 
@@ -25,20 +25,24 @@ class DefaultActionHandler(ActionHandler):
 
     def calc_masks(self, obs):
 
-        to_return = {team: {} for team in teams}
+        to_return = {}
 
-        factory_mask = np.zeros(obs["player_0"]["board"]["ice"].shape)
         for team in teams:
+
+            factory_mask = np.zeros(obs["player_0"]["board"]["ice"].shape)
             for factory in obs[team]["factories"][team].values():
                 factory_mask[
                     factory["pos"][1] - 1 : factory["pos"][1] + 2,
                     factory["pos"][0] - 1 : factory["pos"][0] + 2,
                 ] = 1
 
-        for team in teams:
+            team_mask = np.zeros(
+                (self.action_nb,) + obs["player_0"]["board"]["ice"].shape
+            )
+
             for unit_name, unit in obs[team]["units"][team].items():
 
-                mask = np.ones(11)
+                mask = np.ones(self.action_nb)
 
                 # up action not possible when on the top of the board
                 if unit["pos"][1] == 0:
@@ -80,7 +84,9 @@ class DefaultActionHandler(ActionHandler):
                 if factory_mask[unit["pos"][1], unit["pos"][0]] == 1:
                     mask[7] = 1
 
-                to_return[team][unit_name] = mask
+                team_mask[:, unit["pos"][1], unit["pos"][0]] = mask
+
+            to_return[team] = team_mask
 
         return to_return
 

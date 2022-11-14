@@ -117,11 +117,12 @@ L'espace d'observation va donc être une grosse image avec tout ce qu'il faut en
 
 - une channel de glace
 - une channel de minerais
-- une channel de présence d'usines
-- une channel de distance à l'usine la plus proche
+- une channel de distance à l'usine alliée la plus proche
+- une channel de distance à l'usine ennemie la plus proche
 - une channel de l'heure (sin)
 - une channel de l'heure (cos)
-- une channel de présence de robots
+- une channel de présence de robots alliés
+- une channel de présence de robots ennemis
 - une channel de la quantité de glace portée par le robot (0 sinon)
 - une channel de la quantité de minerais portée par le robot (0 sinon)
 - une channel de la quantité d'énergie portée par le robot (0 sinon)
@@ -131,8 +132,8 @@ L'espace d'observation va donc être une grosse image avec tout ce qu'il faut en
 Créer un environnement pour commencer à entraîner des trucs
 
 - [ ] Faire le ménage quand nécessaire
-- [x] Retourner la carte d'observation.
-- [ ] Retourner la map de mask d'actions (une par team). 
+- [x] Retourner la carte d'observation (une par team).
+- [x] Retourner la map de mask d'actions (une par team). 
 - [ ] Retourner la map de rewards (une par team). Les rewards sont distribués sur les cases des robots à l'observation de départ
 
 Ecrire une fonction de reward pour différents skills :
