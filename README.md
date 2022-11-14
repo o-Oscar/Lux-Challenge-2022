@@ -111,13 +111,27 @@ Le deuxième soucis peut se trouver dans la représentation de l'état du jeu. O
 
 Enfin le dernier soucis est un soucis pratique d'implémentation : Quand chaque robot process se observations de manière indépendante, on peut envoyer à PPO des batchs avec des observations de timesteps différents. Mais si on doit utiliser un réseau de neurone sur toute la carte pour trouver les actions des robots pour un timestep, alors on est obligé d'envoyer toutes les infos d'un (ou plusieurs) timestep en même temps à PPO pour qu'il puisse travailler.
 
+## Espace d'observations
+
+L'espace d'observation va donc être une grosse image avec tout ce qu'il faut en channel pour contenir les mêmes informations que précédemment:
+
+- une channel de glace
+- une channel de minerais
+- une channel de présence d'usines
+- une channel de distance à l'usine la plus proche
+- une channel de l'heure (sin)
+- une channel de l'heure (cos)
+- une channel de présence de robots
+- une channel de la quantité de glace portée par le robot (0 sinon)
+- une channel de la quantité de minerais portée par le robot (0 sinon)
+- une channel de la quantité d'énergie portée par le robot (0 sinon)
 
 # TODO :
 
 Créer un environnement pour commencer à entraîner des trucs
 
 - [ ] Faire le ménage quand nécessaire
-- [ ] Retourner la carte d'observation.
+- [x] Retourner la carte d'observation.
 - [ ] Retourner la map de mask d'actions (une par team). 
 - [ ] Retourner la map de rewards (une par team). Les rewards sont distribués sur les cases des robots à l'observation de départ
 

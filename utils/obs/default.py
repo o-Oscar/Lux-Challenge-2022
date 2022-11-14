@@ -3,93 +3,58 @@ from utils import teams
 import matplotlib.pyplot as plt
 from utils.obs import ObsGenerator
 
-OBS_GRID_HALF_SIZE = 5
-OBS_GRID_SIZE = OBS_GRID_HALF_SIZE * 2 + 1
-OBS_GRID_CHANNELS = 5
-
-OBS_GRID_SHAPE = (OBS_GRID_CHANNELS, OBS_GRID_SIZE, OBS_GRID_SIZE)
-
-OBS_VECTOR_LEN = 7
-
-
-def expand_grid(grid):
-    expanded_grid_size = (
-        grid.shape[0],
-        grid.shape[1] + 2 * OBS_GRID_HALF_SIZE,
-        grid.shape[2] + 2 * OBS_GRID_HALF_SIZE,
-    )
-    expanded_grid = np.zeros(expanded_grid_size)
-    expanded_grid[-1] = 1
-
-    expanded_grid[
-        :,
-        OBS_GRID_HALF_SIZE:-OBS_GRID_HALF_SIZE,
-        OBS_GRID_HALF_SIZE:-OBS_GRID_HALF_SIZE,
-    ] = grid
-    return expanded_grid
-
-
-def get_local_grid(grid, pos):
-    return grid[
-        :,
-        pos[1] : pos[1] + 2 * OBS_GRID_HALF_SIZE + 1,
-        pos[0] : pos[0] + 2 * OBS_GRID_HALF_SIZE + 1,
-    ]
-
-
-def closest_delta(all_pos, pos):
-    closest_id = np.argmin(np.sum(np.abs(all_pos - pos), axis=1))
-    return all_pos[closest_id] - pos
+OBS_GRID_CHANNELS = 10
 
 
 class DefaultObsGenerator(ObsGenerator):
     def __init__(self):
         super().__init__()
 
-        self.grid_shape = OBS_GRID_SHAPE
-        self.vector_shape = (OBS_VECTOR_LEN,)
-
     def calc_obs(self, obs):
         # pre_computation of the full grid features
         full_grid = np.zeros(
             (OBS_GRID_CHANNELS,) + obs["player_0"]["board"]["ice"].shape
         )
+
+        # ice
         full_grid[0] = obs["player_0"]["board"]["ice"]
+
+        # ore
         full_grid[1] = obs["player_0"]["board"]["ore"]
 
-        for team in teams:
-            for unit in obs[team]["units"][team].values():
-                full_grid[2, unit["pos"][1], unit["pos"][0]] = 1
+        # factory
         for team in teams:
             for factory in obs[team]["factories"][team].values():
-                full_grid[3, factory["pos"][1], factory["pos"][0]] = 1
+                full_grid[2, factory["pos"][1], factory["pos"][0]] = 1
 
-        expanded_grid = expand_grid(full_grid)
-
-        # pre_computation of the vector features
-        factories_pos = {team: [] for team in teams}
+        # delta
+        all_x = np.arange(obs["player_0"]["board"]["ice"].shape[0])
+        all_y = np.arange(obs["player_0"]["board"]["ice"].shape[1])
+        all_x, all_y = np.meshgrid(all_x, all_y)
+        all_deltas = []
         for team in teams:
             for factory in obs[team]["factories"][team].values():
-                factories_pos[team].append(factory["pos"])
-        factories_pos = {key: np.array(value) for key, value in factories_pos.items()}
+                cur_delta = np.abs(all_x - factory["pos"][0]) + np.abs(
+                    all_y - factory["pos"][1]
+                )
+                all_deltas.append(cur_delta)
+        full_grid[3] = np.min(all_deltas, axis=0)
 
-        to_return = {team: {} for team in teams}
+        # time in the day
+        full_grid[4] = np.sin(np.pi * 2 * obs[team]["real_env_steps"] / 50)
+        full_grid[5] = np.cos(np.pi * 2 * obs[team]["real_env_steps"] / 50)
+
+        # robot specific features
         for team in teams:
-            if len(factories_pos[team]) > 0:
-                for unit_name, unit in obs[team]["units"][team].items():
+            for unit_name, unit in obs[team]["units"][team].items():
 
-                    # filling the grid
-                    grid = get_local_grid(expanded_grid, unit["pos"])
+                # ice
+                ice_feat = unit["cargo"]["ice"] / 100
+                ore_feat = unit["cargo"]["ore"] / 100
+                power_feat = unit["power"] / 150
+                full_grid[6, unit["pos"][1], unit["pos"][0]] = 1
+                full_grid[7, unit["pos"][1], unit["pos"][0]] = ice_feat
+                full_grid[8, unit["pos"][1], unit["pos"][0]] = ore_feat
+                full_grid[9, unit["pos"][1], unit["pos"][0]] = power_feat
 
-                    # filling the vector
-                    vector = np.zeros(OBS_VECTOR_LEN)
-                    vector[0:2] = closest_delta(factories_pos[team], unit["pos"]) / 5
-                    vector[2] = unit["cargo"]["ice"] / 100
-                    vector[3] = unit["cargo"]["ore"] / 100
-                    vector[4] = unit["power"] / 150
-                    vector[5] = np.sin(np.pi * 2 * obs[team]["real_env_steps"] / 50)
-                    vector[6] = np.cos(np.pi * 2 * obs[team]["real_env_steps"] / 50)
-
-                    to_return[team][unit_name] = {"grid": grid, "vector": vector}
-
-        return to_return
+        return full_grid
