@@ -134,11 +134,11 @@ Créer un environnement pour commencer à entraîner des trucs
 - [ ] Faire le ménage quand nécessaire
 - [x] Retourner la carte d'observation (une par team).
 - [x] Retourner la map de mask d'actions (une par team). 
-- [ ] Retourner la map de rewards (une par team). Les rewards sont distribués sur les cases des robots à l'observation de départ
+- [x] Retourner la map de rewards (une par team). Les rewards sont distribués sur les cases des robots à l'observation de départ
 
 Ecrire une fonction de reward pour différents skills :
 
-- [ ] Ne pas rester sur les cases de spawn, mais surtout ne pas se faire écraser.
+- [x] Ne pas rester sur les cases de spawn, mais surtout ne pas se faire écraser.
 - [ ] Ne pas écraser d'autres robots, mais surtout ne pas se faire écraser.
 - [ ] Ne pas écraser les robots alliés, mais écraser les robots adverses !!
 - [ ] Aller se mettre sur une case où il y a de l'eau

@@ -11,15 +11,16 @@ class DefaultRewardGenerator:
 
     def calc_rewards(self, old_obs, actions, obs):
 
-        to_return = {team: {} for team in teams}
-
-        factory_grid = np.zeros(obs["player_0"]["board"]["ice"].shape)
+        to_return = {}
 
         for team in teams:
+            factory_grid = np.zeros(obs["player_0"]["board"]["ice"].shape)
+
             for factory in obs[team]["factories"][team].values():
                 factory_grid[factory["pos"][1], factory["pos"][0]] = 1
 
-        for team in teams:
+            reward_grid = np.zeros(obs["player_0"]["board"]["ice"].shape)
+
             for unit_id, old_unit in old_obs[team]["units"][team].items():
 
                 cur_reward = 0
@@ -42,6 +43,8 @@ class DefaultRewardGenerator:
                 #     ):
                 #         cur_reward += 1
 
-                to_return[team][unit_id] = cur_reward
+                reward_grid[old_unit["pos"][1], old_unit["pos"][0]] = cur_reward
+
+            to_return[team] = reward_grid
 
         return to_return
