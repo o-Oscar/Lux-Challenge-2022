@@ -1,7 +1,7 @@
-from utils.action import ActionHandler
-from utils.obs import Obs
-from utils.reward import Reward
+from utils.action.move import MoveActionHandler
+from utils.obs.minimal import MinimalObsGenerator
+from utils.reward.survivor import SurvivorRewardGenerator
 
-ACTION_HANDLER = ActionHandler.MOVE
-OBS_GENERATOR = Obs.MINIMAL
-REWARD = Reward.SURVIVOR
+ACTION_HANDLER = MoveActionHandler()
+OBS_GENERATOR = MinimalObsGenerator()
+REWARD = SurvivorRewardGenerator()

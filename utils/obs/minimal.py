@@ -1,7 +1,7 @@
 import numpy as np
 from utils import teams
 import matplotlib.pyplot as plt
-from utils.obs import BaseObsGenerator
+from utils.obs.base import BaseObsGenerator
 
 
 class MinimalObsGenerator(BaseObsGenerator):
@@ -14,6 +14,7 @@ class MinimalObsGenerator(BaseObsGenerator):
         - ice of each robot
         - power of each robot
     """
+
     def __init__(self):
         super().__init__()
 

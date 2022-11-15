@@ -11,19 +11,21 @@ import time
 import luxai2022.config
 import luxai2022.state
 from utils import teams
-from utils.action import ActionHandler
-from utils.obs import Obs
-from utils.reward import Reward
+from utils.action.base import BaseActionHandler
+from utils.obs.base import BaseObsGenerator
+from utils.reward.base import BaseRewardGenerator
 from log_wrapper import LogWrapper
 
 DEFAULT_LOG_PATH = Path("results/logs/")
 
+
 class Env(gym.Env):
-    def __init__(self,
-                 action_hanlder = ActionHandler.BASE,
-                 obs_generator = Obs.BASE,
-                 reward_generator = Reward.BASE
-                 ):
+    def __init__(
+        self,
+        action_hanlder: BaseActionHandler,
+        obs_generator: BaseObsGenerator,
+        reward_generator: BaseRewardGenerator,
+    ):
         # self.observation_shape = (2 * 3,)
         # self.observation_space = spaces.Box(
         #     low=-np.ones(self.observation_shape),

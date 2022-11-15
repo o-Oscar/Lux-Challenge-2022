@@ -1,11 +1,12 @@
 import numpy as np
 from utils import teams
-from utils.reward import BaseRewardGenerator
+from utils.reward.base import BaseRewardGenerator
 
 
 DEATH_REWARD = -1
 ON_SPAWN_REWARD = -0.1
 MOVE_REWARD = 0.1
+
 
 
 class SurvivorMoveRewardGenerator(BaseRewardGenerator):
@@ -32,7 +33,7 @@ class SurvivorMoveRewardGenerator(BaseRewardGenerator):
                 if unit_id not in obs[team]["units"][team]:
                     cur_reward += DEATH_REWARD
 
-                # the unit has gone to the right
+                # the unit has moved
                 if unit_id in actions[team]:
                     if actions[team][unit_id] is not None :
                         cur_reward += MOVE_REWARD

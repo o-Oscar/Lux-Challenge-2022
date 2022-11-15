@@ -1,6 +1,6 @@
 import numpy as np
 from utils import teams
-from utils.reward import BaseRewardGenerator
+from utils.reward.base import BaseRewardGenerator
 
 DEATH_REWARD = -1
 ON_SPAWN_REWARD = -0.1
