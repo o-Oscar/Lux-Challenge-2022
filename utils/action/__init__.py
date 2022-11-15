@@ -1,12 +1,10 @@
-class ActionHandler:
-    def __init__(self):
-        pass
+from enum import Enum
+from base import BaseActionHandler
+from move import MoveActionHandler
+from harvest import HarvestActionHandler
 
-    def calc_masks(self, obs):
-        raise NotImplementedError
 
-    def network_to_robots(self, network_actions):
-        raise NotImplementedError
-
-    def robots_to_network(self, robot_actions):
-        raise NotImplementedError
+class ActionHandler(Enum):
+    BASE = BaseActionHandler()
+    MOVE = MoveActionHandler()
+    HARVEST = HarvestActionHandler()

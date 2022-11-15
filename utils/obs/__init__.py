@@ -1,6 +1,10 @@
-class ObsGenerator:
-    def __init__(self):
-        pass
+from enum import Enum
 
-    def calc_obs(self, obs):
-        raise NotImplementedError
+from base import BaseObsGenerator
+from complete import CompleteObsGenerator
+from minimal import MinimalObsGenerator
+
+class Obs(Enum):
+    BASE = BaseObsGenerator()
+    COMPLETE = CompleteObsGenerator()
+    MINIMAL = MinimalObsGenerator()

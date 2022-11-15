@@ -1,10 +1,21 @@
 import numpy as np
 from utils import teams
 import matplotlib.pyplot as plt
-from utils.obs import ObsGenerator
+from utils.obs import BaseObsGenerator
 
 
-class DefaultObsGenerator(ObsGenerator):
+class CompleteObsGenerator(BaseObsGenerator):
+    """
+    Observations contain :
+        - ice position
+        - ore position
+        - distance to closest factories
+        - time
+        - position of each robot
+        - ore of each robot
+        - ice of each robot
+        - power of each robot
+    """
     def __init__(self):
         super().__init__()
 

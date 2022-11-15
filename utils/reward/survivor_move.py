@@ -1,11 +1,14 @@
 import numpy as np
 from utils import teams
+from utils.reward import BaseRewardGenerator
+
 
 DEATH_REWARD = -1
 ON_SPAWN_REWARD = -0.1
+MOVE_REWARD = 0.1
 
 
-class DefaultRewardGenerator:
+class SurvivorMoveRewardGenerator(BaseRewardGenerator):
     def __init__(self):
         pass
 
@@ -29,19 +32,10 @@ class DefaultRewardGenerator:
                 if unit_id not in obs[team]["units"][team]:
                     cur_reward += DEATH_REWARD
 
-                # is the unit in the middle of a factory (where other units could spawn)
-                if unit_id in obs[team]["units"][team]:
-                    unit = obs[team]["units"][team][unit_id]
-                    if factory_grid[unit["pos"][1], unit["pos"][0]] == 1:
-                        cur_reward += ON_SPAWN_REWARD
-
-                # # the unit has gone to the right
-                # cur_reward = 0
-                # if unit_id in actions[team]:
-                #     if np.array_equal(
-                #         actions[team][unit_id], np.array([0, 1, 0, 0, 0])
-                #     ):
-                #         cur_reward += 1
+                # the unit has gone to the right
+                if unit_id in actions[team]:
+                    if actions[team][unit_id] is not None :
+                        cur_reward += MOVE_REWARD
 
                 reward_grid[old_unit["pos"][1], old_unit["pos"][0]] = cur_reward
 

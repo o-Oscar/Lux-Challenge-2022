@@ -1,6 +1,10 @@
-class RewardGenerator:
-    def __init__(self):
-        pass
+from enum import Enum
 
-    def calc_rewards(self, old_obs, actions, obs):
-        raise NotImplementedError
+from base import BaseRewardGenerator
+from survivor import SurvivorRewardGenerator
+from survivor_move import SurvivorMoveRewardGenerator
+
+class Reward(Enum):
+    BASE = BaseRewardGenerator()
+    SURVIVOR = SurvivorRewardGenerator()
+    SURVIVOR_MOVE = SurvivorMoveRewardGenerator()
