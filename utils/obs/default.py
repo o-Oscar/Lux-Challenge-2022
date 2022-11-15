@@ -3,18 +3,16 @@ from utils import teams
 import matplotlib.pyplot as plt
 from utils.obs import ObsGenerator
 
-OBS_GRID_CHANNELS = 11
-
 
 class DefaultObsGenerator(ObsGenerator):
     def __init__(self):
         super().__init__()
 
+        self.channel_nb = 11
+
     def calc_obs(self, obs):
         # pre_computation of the full grid features
-        full_grid = np.zeros(
-            (OBS_GRID_CHANNELS,) + obs["player_0"]["board"]["ice"].shape
-        )
+        full_grid = np.zeros((self.channel_nb,) + obs["player_0"]["board"]["ice"].shape)
 
         # ice
         full_grid[0] = obs["player_0"]["board"]["ice"]
@@ -33,7 +31,8 @@ class DefaultObsGenerator(ObsGenerator):
                     all_y - factory["pos"][1]
                 )
                 all_deltas.append(cur_delta)
-            full_grid[2 + i] = np.min(all_deltas, axis=0)
+            if len(all_deltas) > 0:
+                full_grid[2 + i] = np.min(all_deltas, axis=0)
 
         # time in the day
         full_grid[4] = np.sin(np.pi * 2 * obs[team]["real_env_steps"] / 50)

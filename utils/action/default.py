@@ -39,6 +39,8 @@ class DefaultActionHandler(ActionHandler):
             team_mask = np.zeros(
                 (self.action_nb,) + obs["player_0"]["board"]["ice"].shape
             )
+            # default "action" when no robot on the spot : doing nothing
+            team_mask[0] = 1
 
             for unit_name, unit in obs[team]["units"][team].items():
 
@@ -90,10 +92,13 @@ class DefaultActionHandler(ActionHandler):
 
         return to_return
 
-    def network_to_robots(self, network_actions):
+    # TODO : integrate the obs to know what order to give to each robot.
+    # network actions will become a grid with no information on the targeted robot.
+    def network_to_robots(self, obs, network_actions):
         to_return = {team: {} for team in teams}
         for team in teams:
-            for unit_name, unit_action in network_actions[team].items():
+            for unit_name, unit in obs[team]["units"][team].items():
+                unit_action = network_actions[team][unit["pos"][1], unit["pos"][0]]
                 cur_action = self.robot_to_env_actions[unit_action]
                 if cur_action is not None:
                     to_return[team][unit_name] = cur_action

@@ -29,57 +29,28 @@ def layer_init(layer, std=np.sqrt(2), bias_const=0.0):
     return layer
 
 
-class ObsHead(nn.Module):
-    def __init__(self, env: Env):
-        super().__init__()
-
-        self.full_grid_size = np.array(env.obs_generator.grid_shape).prod()
-
-        self.grid_head = nn.Sequential(
-            nn.Linear(np.array(env.obs_generator.grid_shape).prod(), 32)
-        )  # TODO: implement some kind of spatial attention here
-        self.vector_head = nn.Sequential(
-            nn.Linear(env.obs_generator.vector_shape[0], 32)
-        )
-
-    def forward(self, obs):
-        grid_obs = obs["grid"].view(-1, self.full_grid_size)
-        grid_feat = self.grid_head(grid_obs)
-
-        vector_feat = self.vector_head(obs["vector"])
-
-        return th.relu(th.concat([grid_feat, vector_feat], dim=1))
-
-
 class Agent(nn.Module):
     def __init__(self, env: Env):
         super().__init__()
-        self.act_backbone = ObsHead(env)
-        self.critic_backbone = ObsHead(env)
+        in_channels = env.obs_generator.channel_nb
         self.critic = nn.Sequential(
-            layer_init(nn.Linear(64, 64)),
-            nn.Tanh(),
-            layer_init(nn.Linear(64, 1), std=1.0),
+            nn.Conv2d(in_channels, 64, 3, padding="same"),
+            nn.ReLU(),
+            nn.Conv2d(64, 1, 3, padding="same"),
         )
         self.actor = nn.Sequential(
-            layer_init(nn.Linear(64, 64)),
-            nn.Tanh(),
-            layer_init(nn.Linear(64, env.action_handler.action_nb), std=0.01),
+            nn.Conv2d(in_channels, 64, 3, padding="same"),
+            nn.ReLU(),
+            nn.Conv2d(64, env.action_handler.action_nb, 3, padding="same"),
         )
 
-    def get_value(self, x):
-        return self.critic(x)
-
-    # def get_action_and_value(self, x, action=None):
-    #     logits = self.actor(x)
-    #     probs = Categorical(logits=logits)
-    #     if action is None:
-    #         action = probs.sample()
-    #     return action, probs.log_prob(action), probs.entropy(), self.critic(x)
+    def get_value(self, obs):
+        return self.critic(obs).squeeze(dim=1)
 
     def get_action(self, obs, masks, action=None):
-        logits = self.actor(self.act_backbone(obs))
+        logits = self.actor(obs)
         logits = logits - BIG_NUMBER * (1 - masks)
+        logits = logits.permute(0, 2, 3, 1)
         probs = Categorical(logits=logits)
         if action is None:
             action = probs.sample()
@@ -87,65 +58,52 @@ class Agent(nn.Module):
             action,
             probs.log_prob(action),
             probs.entropy(),
-            self.critic(self.critic_backbone(obs)).view(-1),
+            self.critic(obs).squeeze(dim=1),
         )
 
-    def get_greedy_action(self, obs, masks, action=None):
-        logits = self.actor(self.act_backbone(obs))
-        logits = logits - BIG_NUMBER * (1 - masks)
-        probs = Categorical(logits=logits)
-        if action is None:
-            action = th.argmax(logits, dim=-1)
-        return (
-            action,
-            probs.log_prob(action),
-            probs.entropy(),
-            self.critic(self.critic_backbone(obs)).view(-1),
-        )
+    # def get_greedy_action(self, obs, masks, action=None):
+    #     logits = self.actor(self.act_backbone(obs))
+    #     logits = logits - BIG_NUMBER * (1 - masks)
+    #     probs = Categorical(logits=logits)
+    #     if action is None:
+    #         action = th.argmax(logits, dim=-1)
+    #     return (
+    #         action,
+    #         probs.log_prob(action),
+    #         probs.entropy(),
+    #         self.critic(self.critic_backbone(obs)).view(-1),
+    #     )
 
 
 def obs_to_network(obs, device):
-    grids = []
-    vectors = []
+    to_return = []
     for team in teams:
-        for unit_id, unit_obs in obs[team].items():
-            grids.append(unit_obs["grid"])
-            vectors.append(unit_obs["vector"])
+        to_return.append(obs[team])
 
-    grid = np.array(grids)
-    vectors = np.array(vectors)
+    to_return = np.stack(to_return)
+    to_return = th.tensor(to_return, device=device, dtype=th.float32)
 
-    grid = th.tensor(grid, device=device, dtype=th.float32)
-    vectors = th.tensor(vectors, device=device, dtype=th.float32)
-
-    return {"grid": grid, "vector": vectors}
+    return to_return
 
 
 def mask_to_network(masks, device):
     to_return = []
     for team in teams:
-        for unit_id, unit_mask in masks[team].items():
-            to_return.append(unit_mask)
+        to_return.append(masks[team])
 
-    to_return = np.array(to_return)
+    to_return = np.stack(to_return)
     to_return = th.tensor(to_return, device=device, dtype=th.float32)
 
     return to_return
 
 
 def actions_to_env(network_actions, obs):
-    to_return = {team: {} for team in teams}
-    network_actions = network_actions.detach().cpu().numpy()
-    id = 0
-    for team in teams:
-        for unit_id in obs[team].keys():
-            to_return[team][unit_id] = network_actions[id]
-            id += 1
+    to_return = {team: network_actions[i] for i, team in enumerate(teams)}
     return to_return
 
 
 def multi_agent_rollout(env: Env, agent: Agent, device, max_ep_len=1100):
-    obs, masks = env.reset()
+    obs, masks, unit_pos = env.reset()
 
     all_obs = [obs]
     all_rewards = []
@@ -153,25 +111,28 @@ def multi_agent_rollout(env: Env, agent: Agent, device, max_ep_len=1100):
     all_actions = []
     all_log_prob = []
     all_values = []
+    all_unit_pos = [unit_pos]
 
     no_unit = False
 
     for t in range(max_ep_len):
+        print(t)
         network_obs = obs_to_network(obs, device)
-        # no_unit = no_unit or network_obs["grid"].shape[0] == 0
 
-        if network_obs["grid"].shape[0] > 0:
-            network_masks = mask_to_network(masks, device)
-            actions, log_prob, _, value = agent.get_action(network_obs, network_masks)
-            actions = actions_to_env(actions, obs)
-            log_prob = actions_to_env(log_prob, obs)
-            value = actions_to_env(value, obs)
-        else:
-            actions = {team: {} for team in teams}
-            log_prob = {team: {} for team in teams}
-            value = {team: {} for team in teams}
+        network_masks = mask_to_network(masks, device)
+        actions, log_prob, _, value = agent.get_action(network_obs, network_masks)
+        actions = actions_to_env(actions, obs)
+        log_prob = actions_to_env(log_prob, obs)
+        value = actions_to_env(value, obs)
 
-        obs, rewards, masks, done = env.step(actions)
+        # if network_obs["grid"].shape[0] > 0:
+        #
+        # else:
+        #     actions = {team: {} for team in teams}
+        #     log_prob = {team: {} for team in teams}
+        #     value = {team: {} for team in teams}
+
+        obs, rewards, masks, done, units_pos = env.step(actions)
 
         all_values.append(value)
 
@@ -183,6 +144,7 @@ def multi_agent_rollout(env: Env, agent: Agent, device, max_ep_len=1100):
         all_rewards.append(rewards)
         all_masks.append(masks)
         all_log_prob.append(log_prob)
+        all_unit_pos.append(unit_pos)
 
     env.save(full_save=False, convenient_save=True)
     # if no_unit:
@@ -196,7 +158,26 @@ def multi_agent_rollout(env: Env, agent: Agent, device, max_ep_len=1100):
         "masks": all_masks,
         "logprob": all_log_prob,
         "values": all_values,
+        "unit_pos": all_unit_pos,
     }
+
+
+def map_robots_grid(robot_pos, next_robot_pos, new_value):
+    to_return = new_value * 0
+    for robot_id, next_pos in next_robot_pos.items():
+        if robot_id in robot_pos:
+            cur_pos = robot_pos[robot_id]
+            to_return[cur_pos[1], cur_pos[0]] = new_value[next_pos[1], next_pos[0]]
+    return to_return
+
+
+def get_team_rollout(
+    rollout,
+    key,
+    team,
+):
+    to_return = [x[team] for x in rollout[key]]
+    return to_return
 
 
 class ReplayBuffer:
@@ -209,86 +190,56 @@ class ReplayBuffer:
         self.lamb = 0.95
 
     def fill(self, batch_size: int):
-        self.all_obs_grid = []
-        self.all_obs_vectors = []
+        self.all_obs = []
         self.all_actions = []
         self.all_rewards = []
         self.all_masks = []
         self.all_logprob = []
         self.all_values = []
+        self.all_unit_pos = []
 
         while len(self) < batch_size:
             self.expand(multi_agent_rollout(self.env, self.agent, self.device))
 
-    def expand(self, rollout):
-        for team in teams:
-            all_agents = set()
-            for obs in rollout["obs"]:
-                for unit_id in obs[team].keys():
-                    all_agents.add(unit_id)
-            all_agents = sorted(all_agents, key=lambda x: int(x[5:]))
-
-            for agent_id in all_agents:
-                agent_obs_grid = []
-                agent_obs_vector = []
-                agent_actions = []
-                agent_rewards = []
-                agent_actmasks = []
-                agent_logprob = []
-                agent_values = []
-
-                for obs in rollout["obs"]:
-                    if agent_id in obs[team]:
-                        agent_obs_grid.append(obs[team][agent_id]["grid"])
-                        agent_obs_vector.append(obs[team][agent_id]["vector"])
-                for act in rollout["actions"]:
-                    if agent_id in act[team]:
-                        agent_actions.append(act[team][agent_id])
-                for rew in rollout["rewards"]:
-                    if agent_id in rew[team]:
-                        agent_rewards.append(rew[team][agent_id])
-                for masks in rollout["masks"]:
-                    if agent_id in masks[team]:
-                        agent_actmasks.append(masks[team][agent_id])
-                for logprob in rollout["logprob"]:
-                    if agent_id in logprob[team]:
-                        agent_logprob.append(logprob[team][agent_id])
-                for values in rollout["values"]:
-                    if agent_id in values[team]:
-                        agent_values.append(values[team][agent_id])
-
-                self.all_obs_grid.append(agent_obs_grid)
-                self.all_obs_vectors.append(agent_obs_vector)
-                self.all_actions.append(agent_actions)
-                self.all_rewards.append(agent_rewards)
-                self.all_masks.append(agent_actmasks)
-                self.all_logprob.append(agent_logprob)
-                self.all_values.append(agent_values)
-
         self.compute_advantage()
         self.compute_gae()
 
+    def expand(self, rollout):
+        for team in teams:
+            self.all_obs.append(get_team_rollout(rollout, "obs", team))
+            self.all_actions.append(get_team_rollout(rollout, "actions", team))
+            self.all_rewards.append(get_team_rollout(rollout, "rewards", team))
+            self.all_masks.append(get_team_rollout(rollout, "masks", team))
+            self.all_logprob.append(get_team_rollout(rollout, "logprob", team))
+            self.all_values.append(get_team_rollout(rollout, "values", team))
+            self.all_unit_pos.append(get_team_rollout(rollout, "unit_pos", team))
+
     def compute_advantage(self):
         self.all_advantages = []
-        for i in range(len(self.all_rewards)):
-            cur_advantages = []
-            for t in range(len(self.all_rewards[i])):
-                rew = self.all_rewards[i][t]
-                prec_value = self.all_values[i][t]
-                if t + 1 < len(self.all_values[i]):
-                    new_value = self.all_values[i][t + 1]
-                else:
-                    new_value = 0
-                cur_advantages.append(rew + self.gamma * new_value - prec_value)
-            self.all_advantages.append(cur_advantages)
+        for game_id in range(len(self.all_rewards)):
+            game_advantages = []
+            for t in range(len(self.all_rewards[game_id])):
+                rew = th.tensor(self.all_rewards[game_id][t], device=self.device)
+                prec_value = self.all_values[game_id][t]
+                new_value = prec_value * 0
+                if t + 1 < len(self.all_unit_pos[game_id]):
+                    robot_pos = self.all_unit_pos[game_id][t]
+                    next_robot_pos = self.all_unit_pos[game_id][t + 1]
+                    new_value = self.all_values[game_id][t + 1]
+                    new_value = map_robots_grid(robot_pos, next_robot_pos, new_value)
+                game_advantages.append(rew + self.gamma * new_value - prec_value)
+            self.all_advantages.append(game_advantages)
 
     def compute_gae(self):
         self.all_gae = []
-        for i in range(len(self.all_advantages)):
+        for game_id in range(len(self.all_advantages)):
+            gae = self.all_advantages[game_id][-1]
             cur_gae = []
-            gae = 0
-            for t in reversed(range(len(self.all_advantages[i]))):
-                gae = self.all_advantages[i][t] + self.gamma * self.lamb * gae
+            for t in range(len(self.all_advantages[game_id]) - 1):
+                robot_pos = self.all_unit_pos[game_id][t]
+                next_robot_pos = self.all_unit_pos[game_id][t + 1]
+                gae = map_robots_grid(robot_pos, next_robot_pos, gae)
+                gae = self.all_advantages[game_id][t] + self.gamma * self.lamb * gae
                 cur_gae.append(gae)
             self.all_gae.append(list(reversed(cur_gae)))
 
@@ -375,8 +326,8 @@ save_path = Path("results/models/survivor")
 save_path.mkdir(exist_ok=True, parents=True)
 
 
-USE_WANDB = True
-SAVE_MODEL = True
+USE_WANDB = False
+SAVE_MODEL = False
 
 if __name__ == "__main__":
     device = th.device("cuda" if th.cuda.is_available() else "cpu")
@@ -423,6 +374,7 @@ if __name__ == "__main__":
         mean_ratio.reset()
 
         buffer.fill(batch_size)
+        exit()
 
         print("| Learning ", end="", flush=True)
 

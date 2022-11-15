@@ -106,6 +106,13 @@ class Env(gym.Env):
         self.action_handler = DefaultActionHandler()
         self.reward_generator = DefaultRewardGenerator()
 
+    def calc_unit_pos(self, obs):
+        to_return = {team: {} for team in teams}
+        for team in teams:
+            for unit_id, unit in obs[team]["units"][team].items():
+                to_return[team][unit_id] = unit["pos"]
+        return to_return
+
     def reset(self):
 
         obs = self.env.reset()
@@ -149,8 +156,9 @@ class Env(gym.Env):
         unit_obs = self.obs_generator.calc_obs(obs)
         action_masks = self.action_handler.calc_masks(obs)
         self.old_obs = obs
+        units_pos = self.calc_unit_pos(obs)
 
-        return unit_obs, action_masks
+        return unit_obs, action_masks, units_pos
 
     def factory_actions(self):
         """
@@ -187,7 +195,7 @@ class Env(gym.Env):
 
     def step(self, a):
         factory_actions = self.factory_actions()
-        units_actions = self.action_handler.network_to_robots(a)
+        units_actions = self.action_handler.network_to_robots(self.old_obs, a)
         actions = self.fuse_actions(factory_actions, units_actions)
 
         obs, rewards, dones, infos = self.env.step(actions)
@@ -198,7 +206,9 @@ class Env(gym.Env):
         rewards = self.reward_generator.calc_rewards(self.old_obs, actions, obs)
 
         self.old_obs = obs
-        return unit_obs, rewards, action_masks, done
+        units_pos = self.calc_unit_pos(obs)
+
+        return unit_obs, rewards, action_masks, done, units_pos
         # return unit_obs, action_masks
 
     def save(self, **kwargs):
