@@ -1,8 +1,11 @@
 import argparse
+import dataclasses
+import itertools
 import os
 import random
 import time
 from distutils.util import strtobool
+from pathlib import Path
 
 import gym
 import numpy as np
@@ -10,110 +13,41 @@ import torch as th
 import torch.nn as nn
 import torch.optim as optim
 from torch.distributions.categorical import Categorical
-from utils.env import get_env, Env
-from utils import teams
-import itertools
+
 import wandb
-from pathlib import Path
+from utils import teams
+from utils.env import Env, get_env
 
 
-# args.batch_size = int(args.num_envs * args.num_steps)
-# args.minibatch_size = int(args.batch_size // args.num_minibatches)
-
-BIG_NUMBER = 1e10
-
-
-def layer_init(layer, std=np.sqrt(2), bias_const=0.0):
-    th.nn.init.orthogonal_(layer.weight, std)
-    th.nn.init.constant_(layer.bias, bias_const)
-    return layer
-
-
-class ObsHead(nn.Module):
-    def __init__(self, env: Env):
+class BaseAgent(nn.Module):
+    def __init__(self):
         super().__init__()
-        self.grid_head = nn.Conv2d(4, 32, 11, padding="same")
-        self.vector_head = nn.Conv2d(5, 32, 1, padding="same")
-
-    def forward(self, obs):
-        grid_obs = obs[:, :4]
-        vector_obs = obs[:, 4:]
-
-        grid_feat = self.grid_head(grid_obs)
-        vector_feat = self.vector_head(vector_obs)
-
-        return th.relu(th.concat([grid_feat, vector_feat], dim=1))
-
-
-class Agent(nn.Module):
-    def __init__(self, env: Env):
-        super().__init__()
-        in_channels = env.obs_generator.channel_nb
-        # self.critic = nn.Sequential(
-        #     ObsHead(env),
-        #     layer_init(nn.Conv2d(64, 64, 1, padding="same")),
-        #     nn.Tanh(),
-        #     layer_init(nn.Conv2d(64, 1, 1, padding="same"), std=1.0),
-        # )
-        # self.actor = nn.Sequential(
-        #     ObsHead(env),
-        #     layer_init(nn.Conv2d(64, 64, 1, padding="same")),
-        #     nn.Tanh(),
-        #     layer_init(
-        #         nn.Conv2d(64, env.action_handler.action_nb, 1, padding="same"), std=0.01
-        #     ),
-        # )
-        self.critic = nn.Sequential(
-            layer_init(nn.Conv2d(9, 64, 1, padding="same")),
-            nn.ReLU(),
-            layer_init(nn.Conv2d(64, 64, 1, padding="same")),
-            nn.Tanh(),
-            layer_init(nn.Conv2d(64, 1, 1, padding="same"), std=1.0),
-        )
-        self.actor = nn.Sequential(
-            layer_init(nn.Conv2d(9, 64, 1, padding="same")),
-            nn.ReLU(),
-            layer_init(nn.Conv2d(64, 64, 1, padding="same")),
-            nn.Tanh(),
-            layer_init(
-                nn.Conv2d(64, env.action_handler.action_nb, 1, padding="same"), std=0.01
-            ),
-        )
 
     def get_value(self, obs):
-        return self.critic(obs).squeeze(dim=1)
+        raise NotImplementedError
 
     def get_action(self, obs, masks, action=None):
-        logits = self.actor(obs)
-        logits = logits * masks - BIG_NUMBER * (1 - masks)
-        logits = logits.permute(0, 2, 3, 1)
-        probs = Categorical(logits=logits)
-        if action is None:
-            action = probs.sample()
-        # action = th.argmax(logits, dim=-1) * 0
-        # else:
-        #     print(action)
-        #     print(probs.log_prob(action))
-        #     exit()
-        return (
-            action,
-            probs.log_prob(action),
-            probs.entropy(),
-            self.critic(obs).squeeze(dim=1),
-        )
+        raise NotImplementedError
 
-    # def get_greedy_action(self, obs, masks, action=None):
-    #     logits = self.actor(self.act_backbone(obs))
-    #     logits = logits - BIG_NUMBER * (1 - masks)
-    #     probs = Categorical(logits=logits)
-    #     if action is None:
-    #         action = th.argmax(logits, dim=-1)
-    #     return (
-    #         action,
-    #         probs.log_prob(action),
-    #         probs.entropy(),
-    #         self.critic(self.critic_backbone(obs)).view(-1),
-    #     )
+
+@dataclasses.dataclass
+class PPOConfig:
+    agent: BaseAgent
+    env: Env
+    save_path: Path
+    device: th.device
+    wandb: bool = False
+    epoch_per_save: int = 0
+    min_batch_size: int = 32
+    update_nb: int = 1000
+
+
+# TODO : add that to the ppo config
+clip_coef = 0.1
+norm_adv = True
+ent_coef = 0
+vf_coef = 1
+max_grad_norm = 0.5
 
 
 def obs_to_network(obs, device):
@@ -143,7 +77,7 @@ def actions_to_env(network_actions, obs):
     return to_return
 
 
-def multi_agent_rollout(env: Env, agent: Agent, device, max_ep_len=1100):
+def multi_agent_rollout(env: Env, agent: BaseAgent, device, max_ep_len=1100):
     obs, masks, unit_pos = env.reset()
 
     all_obs = [obs]
@@ -227,7 +161,7 @@ def get_team_rollout(
 
 
 class ReplayBuffer:
-    def __init__(self, env: Env, agent: Agent, device):
+    def __init__(self, env: Env, agent: BaseAgent, device):
         self.env = env
         self.agent = agent
         self.device = device
@@ -368,11 +302,11 @@ class ReplayBuffer:
         ret_obs = np.stack(ret_obs)
         ret_masks = np.stack(ret_masks)
 
-        ret_obs = th.tensor(ret_obs, device=device, dtype=th.float32)
+        ret_obs = th.tensor(ret_obs, device=self.device, dtype=th.float32)
         ret_actions = th.stack(ret_actions).detach()
         ret_logprob = th.stack(ret_logprob).detach()
         ret_gae = th.stack(ret_gae).detach()
-        ret_masks = th.tensor(ret_masks, device=device, dtype=th.float32)
+        ret_masks = th.tensor(ret_masks, device=self.device, dtype=th.float32)
         ret_returns = th.stack(ret_returns).detach()
 
         # print("shapes")
@@ -411,25 +345,8 @@ class MeanLogger:
         return self.sum / self.n
 
 
-batch_size = 16
-mini_batch_size = 4
-
-clip_coef = 0.1
-norm_adv = True
-ent_coef = 0  # 3e-5
-vf_coef = 1
-max_grad_norm = 0.5
-
-save_path = Path("results/models/survivor_grid")
-save_path.mkdir(exist_ok=True, parents=True)
-
-
-USE_WANDB = True
-SAVE_MODEL = False
-
-
 def m_mean(array, mask):
-    return (array * mask).sum() / mask.sum()
+    return (array * mask).sum() / (mask.sum() + 1e-5)
 
 
 def m_var(array, mask):
@@ -437,25 +354,25 @@ def m_var(array, mask):
     return m_mean((array - m) ** 2, mask)
 
 
-if __name__ == "__main__":
-    device = th.device("cuda" if th.cuda.is_available() else "cpu")
-    # device = th.device("cpu")
+def start_ppo(config: PPOConfig):
 
-    if USE_WANDB:
-        wandb.init(project="lux_ai_ppo")
+    if config.epoch_per_save > 0 and config.save_path.is_dir():
+        raise NameError("Save folder already exists. Default is to not override")
+    if config.epoch_per_save > 0:
+        config.save_path.mkdir(exist_ok=False, parents=True)
 
-    # env setup
-    env = get_env()
+    if config.wandb:
+        wandb.init(project="lux_ai_ppo", name=config.save_path.name)
 
-    agent = Agent(env).to(device)
-    model_name = "0315"
-    # agent.load_state_dict(th.load(save_path / model_name))
+    env = config.env
+
+    device = config.device
+
+    agent = config.agent.to(device)
     optimizer = optim.Adam(agent.parameters(), lr=2.5e-4, eps=1e-5)
-    # optimizer = optim.Adam(agent.parameters(), lr=1e-4, eps=1e-5)
 
     buffer = ReplayBuffer(env, agent, device)
 
-    global_step = 0
     start_time = time.time()
 
     value_loss = MeanLogger()
@@ -468,14 +385,14 @@ if __name__ == "__main__":
     mean_ratio = MeanLogger()
     mean_reward = MeanLogger()
 
-    for update in range(10000):
+    for update in range(config.update_nb):
 
         start_time = time.time()
         print("Update {} | Trajs computation ".format(update), end="", flush=True)
 
-        if (update + 1) % 10 == 0 and SAVE_MODEL:
+        if config.epoch_per_save > 0 and (update + 1) % config.epoch_per_save == 0:
             model_name = "{:04d}".format(update)
-            th.save(agent.state_dict(), save_path / model_name)
+            th.save(agent.state_dict(), config.save_path / model_name)
 
         value_loss.reset()
         policy_loss.reset()
@@ -487,20 +404,16 @@ if __name__ == "__main__":
         mean_ratio.reset()
         mean_reward.reset()
 
-        buffer.fill(batch_size)
+        buffer.fill(config.min_batch_size)
         # exit()
 
         print("| Learning ", end="", flush=True)
-        # print("couco")
 
         for epoch in range(4):
             for obs, act, logprob, gae, masks, rets in buffer.sample(
                 batch_size=len(buffer) // 4
             ):
 
-                # print(th.sum(obs[0]))
-                # print(th.where(masks[0]))
-                # exit()
                 _, newlogprob, entropy, newvalue = agent.get_action(obs, masks, act)
                 logratio = newlogprob - logprob
                 ratio = logratio.exp()
@@ -508,18 +421,8 @@ if __name__ == "__main__":
                 robot_mask = th.max(masks, dim=1).values
 
                 ratio = ratio * robot_mask
-                # r = logratio.detach().cpu().numpy()
-                # import matplotlib.pyplot as plt
-
-                # for rp in r:
-                #     print(np.min(rp), np.max(rp))
-                #     plt.imshow(rp)
-                #     plt.show()
-
-                # exit()
 
                 with th.no_grad():
-                    # calculate approx_kl http://joschu.net/blog/kl-approx.html
                     old_approx_kl = (-logratio * robot_mask).sum() / robot_mask.sum()
                     approx_kl = m_mean((ratio - 1) - logratio, robot_mask)
                     clipfracs = m_mean(
@@ -537,19 +440,7 @@ if __name__ == "__main__":
                 pg_loss = m_mean(th.max(pg_loss1, pg_loss2), robot_mask)
 
                 # Value loss
-                # newvalue = newvalue.view(-1)
-                if False:
-                    v_loss_unclipped = (newvalue - b_returns[mb_inds]) ** 2
-                    v_clipped = b_values[mb_inds] + th.clamp(
-                        newvalue - b_values[mb_inds],
-                        -args.clip_coef,
-                        args.clip_coef,
-                    )
-                    v_loss_clipped = (v_clipped - b_returns[mb_inds]) ** 2
-                    v_loss_max = th.max(v_loss_unclipped, v_loss_clipped)
-                    v_loss = 0.5 * v_loss_max.mean()
-                else:
-                    v_loss = 0.5 * m_mean((newvalue - rets) ** 2, robot_mask)
+                v_loss = 0.5 * m_mean((newvalue - rets) ** 2, robot_mask)
 
                 entropy_loss = m_mean(entropy, robot_mask)
                 loss = pg_loss - ent_coef * entropy_loss + v_loss * vf_coef
@@ -580,13 +471,21 @@ if __name__ == "__main__":
                 )
                 explained_variance.update(explained_var, n)
                 mean_ratio.update(m_mean(ratio, robot_mask), n)
-                # mean_reward.update(m_mean(rew))
-
-            # exit()
 
         to_log = {}
 
+        # mean reward computation
+        mean_rew = 0
+        for rew, mask in zip(buffer.all_rewards, buffer.all_masks):
+            m = np.array(mask)
+            m = np.max(m, axis=1)[:-1]
+            r = np.array(rew)
+            mean_rew += np.sum(m * r) / np.sum(m) / len(teams)
+
+        # logging
+        to_log["main/mean_reward"] = mean_rew
         to_log["main/value_loss"] = value_loss.value
+
         to_log["infos/policy_loss"] = policy_loss.value
         to_log["infos/policy_loss"] = policy_loss.value
         to_log["infos/entropy"] = entropy_logger.value
@@ -595,21 +494,10 @@ if __name__ == "__main__":
         to_log["infos/explained_variance"] = explained_variance.value
         to_log["infos/mean_ratio"] = mean_ratio.value
 
-        mean_rew = 0
-        for rew, mask in zip(buffer.all_rewards, buffer.all_masks):
-            m = np.array(mask)
-            m = np.max(m, axis=1)[:-1]
-            r = np.array(rew)
-            mean_rew += np.sum(m * r) / np.sum(m) * 0.5
-
-        to_log["main/mean_reward"] = mean_rew
-        # to_log["main/mean_reward"] = np.mean(list(itertools.chain(*buffer.all_rewards)))
-
-        if USE_WANDB:
+        if config.wandb:
             wandb.log(to_log)
 
         print("| Done ({:.03f}s)".format(time.time() - start_time))
 
-        # exit()
-
-    env.close()
+        if not config.wandb:
+            print(to_log)

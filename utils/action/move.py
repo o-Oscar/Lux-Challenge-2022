@@ -1,6 +1,7 @@
-from utils.action.base import BaseActionHandler
-from utils import teams
 import numpy as np
+
+from utils import teams
+from utils.action.base import BaseActionHandler
 
 
 class MoveActionHandler(BaseActionHandler):
@@ -33,8 +34,6 @@ class MoveActionHandler(BaseActionHandler):
             team_mask = np.zeros(
                 (self.action_nb,) + obs["player_0"]["board"]["ice"].shape
             )
-            # default "action" when no robot on the spot : doing nothing
-            team_mask[0] = 1
 
             for unit_name, unit in obs[team]["units"][team].items():
 
@@ -52,6 +51,8 @@ class MoveActionHandler(BaseActionHandler):
                 # left action not possible when on the left of the board
                 if unit["pos"][0] == 0:
                     mask[4] = 0
+
+                team_mask[:, unit["pos"][1], unit["pos"][0]] = mask
 
             to_return[team] = team_mask
 

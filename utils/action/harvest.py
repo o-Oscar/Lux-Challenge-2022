@@ -1,6 +1,7 @@
-from utils.action.base import BaseActionHandler
-from utils import teams
 import numpy as np
+
+from utils import teams
+from utils.action.base import BaseActionHandler
 
 
 class HarvestActionHandler(BaseActionHandler):
@@ -39,8 +40,6 @@ class HarvestActionHandler(BaseActionHandler):
             team_mask = np.zeros(
                 (self.action_nb,) + obs["player_0"]["board"]["ice"].shape
             )
-            # default "action" when no robot on the spot : doing nothing
-            # team_mask[0] = 1
 
             for unit_name, unit in obs[team]["units"][team].items():
 

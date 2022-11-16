@@ -1,6 +1,7 @@
-import numpy as np
-from utils import teams
 import matplotlib.pyplot as plt
+import numpy as np
+
+from utils import teams
 from utils.obs.base import BaseObsGenerator
 
 

@@ -2,6 +2,12 @@
 
 # Lux AI
 
+## Commandes utiles
+
+Pour lancer un entraînement :
+```
+python -m bots.survivor.train -h
+```
 
 ## Etapes cleef de developpement qui nous permettent de dire qu'on a fait des progrès
 
