@@ -152,10 +152,10 @@ class Env(gym.Env):
 
         # turn 0 : creating robots for each team
         obs, rewards, dones, infos = self.env.step(self.factory_actions())
+        self.old_obs = obs
 
         unit_obs = self.obs_generator.calc_obs(obs)
         action_masks = self.action_handler.calc_masks(obs)
-        self.old_obs = obs
         units_pos = self.calc_unit_pos(obs)
 
         return unit_obs, action_masks, units_pos

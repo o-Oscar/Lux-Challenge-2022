@@ -29,19 +29,55 @@ def layer_init(layer, std=np.sqrt(2), bias_const=0.0):
     return layer
 
 
+class ObsHead(nn.Module):
+    def __init__(self, env: Env):
+        super().__init__()
+        self.grid_head = nn.Conv2d(4, 32, 11, padding="same")
+        self.vector_head = nn.Conv2d(5, 32, 1, padding="same")
+
+    def forward(self, obs):
+        grid_obs = obs[:, :4]
+        vector_obs = obs[:, 4:]
+
+        grid_feat = self.grid_head(grid_obs)
+        vector_feat = self.vector_head(vector_obs)
+
+        return th.relu(th.concat([grid_feat, vector_feat], dim=1))
+
+
 class Agent(nn.Module):
     def __init__(self, env: Env):
         super().__init__()
         in_channels = env.obs_generator.channel_nb
+        # self.critic = nn.Sequential(
+        #     ObsHead(env),
+        #     layer_init(nn.Conv2d(64, 64, 1, padding="same")),
+        #     nn.Tanh(),
+        #     layer_init(nn.Conv2d(64, 1, 1, padding="same"), std=1.0),
+        # )
+        # self.actor = nn.Sequential(
+        #     ObsHead(env),
+        #     layer_init(nn.Conv2d(64, 64, 1, padding="same")),
+        #     nn.Tanh(),
+        #     layer_init(
+        #         nn.Conv2d(64, env.action_handler.action_nb, 1, padding="same"), std=0.01
+        #     ),
+        # )
         self.critic = nn.Sequential(
-            nn.Conv2d(in_channels, 64, 3, padding="same"),
+            layer_init(nn.Conv2d(9, 64, 1, padding="same")),
             nn.ReLU(),
-            nn.Conv2d(64, 1, 3, padding="same"),
+            layer_init(nn.Conv2d(64, 64, 1, padding="same")),
+            nn.Tanh(),
+            layer_init(nn.Conv2d(64, 1, 1, padding="same"), std=1.0),
         )
         self.actor = nn.Sequential(
-            nn.Conv2d(in_channels, 64, 3, padding="same"),
+            layer_init(nn.Conv2d(9, 64, 1, padding="same")),
             nn.ReLU(),
-            nn.Conv2d(64, env.action_handler.action_nb, 3, padding="same"),
+            layer_init(nn.Conv2d(64, 64, 1, padding="same")),
+            nn.Tanh(),
+            layer_init(
+                nn.Conv2d(64, env.action_handler.action_nb, 1, padding="same"), std=0.01
+            ),
         )
 
     def get_value(self, obs):
@@ -49,11 +85,16 @@ class Agent(nn.Module):
 
     def get_action(self, obs, masks, action=None):
         logits = self.actor(obs)
-        logits = logits - BIG_NUMBER * (1 - masks)
+        logits = logits * masks - BIG_NUMBER * (1 - masks)
         logits = logits.permute(0, 2, 3, 1)
         probs = Categorical(logits=logits)
         if action is None:
             action = probs.sample()
+        # action = th.argmax(logits, dim=-1) * 0
+        # else:
+        #     print(action)
+        #     print(probs.log_prob(action))
+        #     exit()
         return (
             action,
             probs.log_prob(action),
@@ -116,8 +157,11 @@ def multi_agent_rollout(env: Env, agent: Agent, device, max_ep_len=1100):
     no_unit = False
 
     for t in range(max_ep_len):
-        print(t)
         network_obs = obs_to_network(obs, device)
+
+        # if t == 0:
+        #     # print(th.sum(th.tensor(obs[teams[0]], device=device, dtype=th.float32)))
+        #     print(th.where(th.tensor(masks[teams[0]], device=device, dtype=th.float32)))
 
         network_masks = mask_to_network(masks, device)
         actions, log_prob, _, value = agent.get_action(network_obs, network_masks)
@@ -132,7 +176,8 @@ def multi_agent_rollout(env: Env, agent: Agent, device, max_ep_len=1100):
         #     log_prob = {team: {} for team in teams}
         #     value = {team: {} for team in teams}
 
-        obs, rewards, masks, done, units_pos = env.step(actions)
+        obs, rewards, masks, done, unit_pos = env.step(actions)
+        # print(np.min(rewards[teams[0]]), np.max(rewards[teams[0]]))
 
         all_values.append(value)
 
@@ -147,6 +192,7 @@ def multi_agent_rollout(env: Env, agent: Agent, device, max_ep_len=1100):
         all_unit_pos.append(unit_pos)
 
     env.save(full_save=False, convenient_save=True)
+    # exit()
     # if no_unit:
     #     print("no units !!")
     #     exit()
@@ -227,21 +273,62 @@ class ReplayBuffer:
                     next_robot_pos = self.all_unit_pos[game_id][t + 1]
                     new_value = self.all_values[game_id][t + 1]
                     new_value = map_robots_grid(robot_pos, next_robot_pos, new_value)
-                game_advantages.append(rew + self.gamma * new_value - prec_value)
+
+                advantage = rew + self.gamma * new_value - prec_value
+                game_advantages.append(advantage)
             self.all_advantages.append(game_advantages)
 
     def compute_gae(self):
         self.all_gae = []
         for game_id in range(len(self.all_advantages)):
             gae = self.all_advantages[game_id][-1]
-            cur_gae = []
-            for t in range(len(self.all_advantages[game_id]) - 1):
+            # gae = gae * 0
+            cur_gae = [gae]
+            for t in reversed(range(len(self.all_advantages[game_id]) - 1)):
                 robot_pos = self.all_unit_pos[game_id][t]
                 next_robot_pos = self.all_unit_pos[game_id][t + 1]
                 gae = map_robots_grid(robot_pos, next_robot_pos, gae)
                 gae = self.all_advantages[game_id][t] + self.gamma * self.lamb * gae
+                # gae = gae * 0
                 cur_gae.append(gae)
+
             self.all_gae.append(list(reversed(cur_gae)))
+
+        # game_id = 0
+        # r_id = list(self.all_unit_pos[game_id][0].keys())[0]
+        # print(r_id)
+        # for t in range(len(self.all_unit_pos[game_id])):
+        #     robot_pos = self.all_unit_pos[game_id][t]
+        #     for robot_id, cur_pos in robot_pos.items():
+        #         if robot_id == r_id:
+
+        #             gae = self.all_gae[game_id][t]
+        #             value = self.all_values[game_id][t]
+        #             reward = self.all_rewards[game_id][t]
+        #             advantage = self.all_advantages[game_id][t]
+
+        #             print(
+        #                 t,
+        #                 gae[cur_pos[1], cur_pos[0]].item(),
+        #                 advantage[cur_pos[1], cur_pos[0]].item(),
+        #                 value[cur_pos[1], cur_pos[0]].item(),
+        #                 reward[cur_pos[1], cur_pos[0]].item(),
+        #                 (cur_pos[1], cur_pos[0]),
+        #             )
+        # exit()
+
+        # print(
+        #     len(self.all_obs[game_id]),
+        #     len(self.all_actions[game_id]),
+        #     len(self.all_rewards[game_id]),
+        #     len(self.all_masks[game_id]),
+        #     len(self.all_logprob[game_id]),
+        #     len(self.all_values[game_id]),
+        #     len(self.all_unit_pos[game_id]),
+        #     len(self.all_advantages[game_id]),
+        #     len(self.all_gae[game_id]),
+        # )
+        # exit()
 
     def __len__(self):
         return sum([len(x) for x in self.all_actions])
@@ -258,8 +345,7 @@ class ReplayBuffer:
                 yield self.generate_batch(ids[batch_start:batch_end])
 
     def generate_batch(self, ids):
-        ret_obs_grid = []
-        ret_obs_vector = []
+        ret_obs = []
         ret_actions = []
         ret_logprob = []
         ret_gae = []
@@ -267,8 +353,7 @@ class ReplayBuffer:
         ret_returns = []
 
         for id in ids:
-            ret_obs_grid.append(self.all_obs_grid[id[0]][id[1]])
-            ret_obs_vector.append(self.all_obs_vectors[id[0]][id[1]])
+            ret_obs.append(self.all_obs[id[0]][id[1]])
             ret_actions.append(self.all_actions[id[0]][id[1]])
             ret_logprob.append(self.all_logprob[id[0]][id[1]])
             ret_gae.append(self.all_gae[id[0]][id[1]])
@@ -277,17 +362,30 @@ class ReplayBuffer:
                 self.all_gae[id[0]][id[1]] + self.all_values[id[0]][id[1]]
             )
 
-        ret_obs_grid = th.tensor(ret_obs_grid, device=device, dtype=th.float32)
-        ret_obs_vector = th.tensor(ret_obs_vector, device=device, dtype=th.float32)
-        ret_actions = th.tensor(ret_actions, device=device, dtype=th.float32)
-        ret_logprob = th.tensor(ret_logprob, device=device, dtype=th.float32)
-        ret_gae = th.tensor(ret_gae, device=device, dtype=th.float32)
+        # print(ret_actions)
+        # print(ret_gae[0])
+
+        ret_obs = np.stack(ret_obs)
+        ret_masks = np.stack(ret_masks)
+
+        ret_obs = th.tensor(ret_obs, device=device, dtype=th.float32)
+        ret_actions = th.stack(ret_actions).detach()
+        ret_logprob = th.stack(ret_logprob).detach()
+        ret_gae = th.stack(ret_gae).detach()
         ret_masks = th.tensor(ret_masks, device=device, dtype=th.float32)
-        ret_returns = th.tensor(ret_returns, device=device, dtype=th.float32)
+        ret_returns = th.stack(ret_returns).detach()
+
+        # print("shapes")
+        # print(ret_obs.shape)
+        # print(ret_actions.shape)
+        # print(ret_logprob.shape)
+        # print(ret_gae.shape)
+        # print(ret_masks.shape)
+        # print(ret_returns.shape)
+        # exit()
 
         return (
-            ret_obs_grid,
-            ret_obs_vector,
+            ret_obs,
             ret_actions,
             ret_logprob,
             ret_gae,
@@ -304,9 +402,9 @@ class MeanLogger:
         self.n = 0
         self.sum = 0
 
-    def update(self, value):
-        self.n += 1
-        self.sum += value
+    def update(self, value, n=1):
+        self.n += n
+        self.sum += value * n
 
     @property
     def value(self):
@@ -318,19 +416,30 @@ mini_batch_size = 4
 
 clip_coef = 0.1
 norm_adv = True
-ent_coef = 0
+ent_coef = 0  # 3e-5
 vf_coef = 1
 max_grad_norm = 0.5
 
-save_path = Path("results/models/survivor")
+save_path = Path("results/models/survivor_grid")
 save_path.mkdir(exist_ok=True, parents=True)
 
 
-USE_WANDB = False
+USE_WANDB = True
 SAVE_MODEL = False
+
+
+def m_mean(array, mask):
+    return (array * mask).sum() / mask.sum()
+
+
+def m_var(array, mask):
+    m = m_mean(array, mask)
+    return m_mean((array - m) ** 2, mask)
+
 
 if __name__ == "__main__":
     device = th.device("cuda" if th.cuda.is_available() else "cpu")
+    # device = th.device("cpu")
 
     if USE_WANDB:
         wandb.init(project="lux_ai_ppo")
@@ -339,7 +448,10 @@ if __name__ == "__main__":
     env = get_env()
 
     agent = Agent(env).to(device)
+    model_name = "0315"
+    # agent.load_state_dict(th.load(save_path / model_name))
     optimizer = optim.Adam(agent.parameters(), lr=2.5e-4, eps=1e-5)
+    # optimizer = optim.Adam(agent.parameters(), lr=1e-4, eps=1e-5)
 
     buffer = ReplayBuffer(env, agent, device)
 
@@ -354,13 +466,14 @@ if __name__ == "__main__":
     clipfrac_logger = MeanLogger()
     explained_variance = MeanLogger()
     mean_ratio = MeanLogger()
+    mean_reward = MeanLogger()
 
     for update in range(10000):
 
         start_time = time.time()
         print("Update {} | Trajs computation ".format(update), end="", flush=True)
 
-        if (update) % 10 == 0 and SAVE_MODEL:
+        if (update + 1) % 10 == 0 and SAVE_MODEL:
             model_name = "{:04d}".format(update)
             th.save(agent.state_dict(), save_path / model_name)
 
@@ -372,39 +485,59 @@ if __name__ == "__main__":
         clipfrac_logger.reset()
         explained_variance.reset()
         mean_ratio.reset()
+        mean_reward.reset()
 
         buffer.fill(batch_size)
-        exit()
+        # exit()
 
         print("| Learning ", end="", flush=True)
+        # print("couco")
 
         for epoch in range(4):
-            for obs_g, obs_v, act, logprob, gae, masks, rets in buffer.sample(
+            for obs, act, logprob, gae, masks, rets in buffer.sample(
                 batch_size=len(buffer) // 4
             ):
 
-                _, newlogprob, entropy, newvalue = agent.get_action(
-                    {"grid": obs_g, "vector": obs_v}, masks, act
-                )
+                # print(th.sum(obs[0]))
+                # print(th.where(masks[0]))
+                # exit()
+                _, newlogprob, entropy, newvalue = agent.get_action(obs, masks, act)
                 logratio = newlogprob - logprob
                 ratio = logratio.exp()
 
+                robot_mask = th.max(masks, dim=1).values
+
+                ratio = ratio * robot_mask
+                # r = logratio.detach().cpu().numpy()
+                # import matplotlib.pyplot as plt
+
+                # for rp in r:
+                #     print(np.min(rp), np.max(rp))
+                #     plt.imshow(rp)
+                #     plt.show()
+
+                # exit()
+
                 with th.no_grad():
                     # calculate approx_kl http://joschu.net/blog/kl-approx.html
-                    old_approx_kl = (-logratio).mean()
-                    approx_kl = ((ratio - 1) - logratio).mean()
-                    clipfracs = ((ratio - 1.0).abs() > clip_coef).float().mean().item()
+                    old_approx_kl = (-logratio * robot_mask).sum() / robot_mask.sum()
+                    approx_kl = m_mean((ratio - 1) - logratio, robot_mask)
+                    clipfracs = m_mean(
+                        ((ratio - 1.0).abs() > clip_coef).float(), robot_mask
+                    )
 
                 if norm_adv:
-                    gae = (gae - gae.mean()) / (gae.std() + 1e-8)
+                    gae_mean = m_mean(gae, robot_mask)
+                    gae_std = th.sqrt(m_var(gae, robot_mask))
+                    gae = (gae - gae_mean) / (gae_std + 1e-8)
 
                 # Policy loss
                 pg_loss1 = -gae * ratio
                 pg_loss2 = -gae * th.clamp(ratio, 1 - clip_coef, 1 + clip_coef)
-                pg_loss = th.max(pg_loss1, pg_loss2).mean()
+                pg_loss = m_mean(th.max(pg_loss1, pg_loss2), robot_mask)
 
                 # Value loss
-                newvalue = newvalue.view(-1)
+                # newvalue = newvalue.view(-1)
                 if False:
                     v_loss_unclipped = (newvalue - b_returns[mb_inds]) ** 2
                     v_clipped = b_values[mb_inds] + th.clamp(
@@ -416,9 +549,9 @@ if __name__ == "__main__":
                     v_loss_max = th.max(v_loss_unclipped, v_loss_clipped)
                     v_loss = 0.5 * v_loss_max.mean()
                 else:
-                    v_loss = 0.5 * ((newvalue - rets) ** 2).mean()
+                    v_loss = 0.5 * m_mean((newvalue - rets) ** 2, robot_mask)
 
-                entropy_loss = entropy.mean()
+                entropy_loss = m_mean(entropy, robot_mask)
                 loss = pg_loss - ent_coef * entropy_loss + v_loss * vf_coef
 
                 optimizer.zero_grad()
@@ -426,25 +559,28 @@ if __name__ == "__main__":
                 nn.utils.clip_grad_norm_(agent.parameters(), max_grad_norm)
                 optimizer.step()
 
-                value_loss.update(v_loss.detach().cpu().item())
-                policy_loss.update(pg_loss.detach().cpu().item())
-                entropy_logger.update(entropy_loss.detach().cpu().item())
+                n = robot_mask.sum().item()
+                value_loss.update(v_loss.detach().cpu().item(), n)
+                policy_loss.update(pg_loss.detach().cpu().item(), n)
+                entropy_logger.update(entropy_loss.detach().cpu().item(), n)
                 old_approx_kl_logger.update(
-                    th.mean(old_approx_kl).detach().cpu().item()
+                    th.mean(old_approx_kl).detach().cpu().item(), n
                 )
-                approx_kl_logger.update(th.mean(approx_kl).detach().cpu().item())
-                clipfrac_logger.update(clipfracs)
+                approx_kl_logger.update(
+                    m_mean(approx_kl, robot_mask).detach().cpu().item(), n
+                )
+                clipfrac_logger.update(clipfracs.item(), n)
 
-                y_pred, y_true = (
-                    newvalue.detach().cpu().numpy(),
-                    rets.detach().cpu().numpy(),
-                )
-                var_y = np.var(y_true)
+                y_pred, y_true = newvalue, rets
+                var_y = m_var(y_true, robot_mask).item()
                 explained_var = (
-                    np.nan if var_y == 0 else 1 - np.var(y_true - y_pred) / var_y
+                    np.nan
+                    if var_y == 0
+                    else (1 - m_var(y_true - y_pred, robot_mask).item() / var_y)
                 )
-                explained_variance.update(explained_var)
-                mean_ratio.update(ratio.mean().detach().cpu().item())
+                explained_variance.update(explained_var, n)
+                mean_ratio.update(m_mean(ratio, robot_mask), n)
+                # mean_reward.update(m_mean(rew))
 
             # exit()
 
@@ -459,11 +595,21 @@ if __name__ == "__main__":
         to_log["infos/explained_variance"] = explained_variance.value
         to_log["infos/mean_ratio"] = mean_ratio.value
 
-        to_log["main/mean_reward"] = np.mean(list(itertools.chain(*buffer.all_rewards)))
+        mean_rew = 0
+        for rew, mask in zip(buffer.all_rewards, buffer.all_masks):
+            m = np.array(mask)
+            m = np.max(m, axis=1)[:-1]
+            r = np.array(rew)
+            mean_rew += np.sum(m * r) / np.sum(m) * 0.5
+
+        to_log["main/mean_reward"] = mean_rew
+        # to_log["main/mean_reward"] = np.mean(list(itertools.chain(*buffer.all_rewards)))
 
         if USE_WANDB:
             wandb.log(to_log)
 
         print("| Done ({:.03f}s)".format(time.time() - start_time))
+
+        # exit()
 
     env.close()
