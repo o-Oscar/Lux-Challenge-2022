@@ -117,15 +117,28 @@ L'espace d'observation va donc être une grosse image avec tout ce qu'il faut en
 
 - une channel de glace
 - une channel de minerais
-- une channel de distance à l'usine alliée la plus proche
-- une channel de distance à l'usine ennemie la plus proche
-- une channel de l'heure (sin)
-- une channel de l'heure (cos)
-- une channel de présence de robots alliés
-- une channel de présence de robots ennemis
+- une channel de présence de robots
+- une channel de présence d'usine
 - une channel de la quantité de glace portée par le robot (0 sinon)
 - une channel de la quantité de minerais portée par le robot (0 sinon)
 - une channel de la quantité d'énergie portée par le robot (0 sinon)
+- une channel de l'heure (sin)
+- une channel de l'heure (cos)
+
+## Implémentation et remarques
+
+En lançant l'entrainement avec un réseau convolutionnel simple, on se rend vite compte qu'il y a un problème : Les agents ont des comportements très vite très déterministiques. Cette observation est un peu surprenante en sachant que le réseau de neurone a accès aux mêmes données que les réseaux de neurones de la précédente approche. Alors j'ai passé à peu près 3h à essayer de trouver des erreurs dans le code, mais rien n'y fait, on a toujours un comportement différent si on utilise un réseau de neurones à convolution simple qui prend en entrée toute la map.
+
+Pour se rapprocher au plus de l'implémentation initiale (en gardant un ppo qui fonctionne avec une grille), j'ai re-structuré le réseau de neurones de manière à copier la structure du précédent réseau de neurones : Il y a un chemin du réseua de neurone qui utilise les observations "de carte" du robot et un chemin qui utilise les observations "d'état" du robot.
+
+- Les observations de carte (les 4 premières channels) sont récupérées par un layer de convolution de taille 11 (même taille que la grille dans le ppo par agent).
+- Les observations d'état (les 5 dernières channels) sont récupérées par un layer de convolution de taille 1. Il agit comme un fully connected sur les features locales.
+
+Ensuite, on passe la concaténation des outputs de ces deux layers dans une série de layers de convolutions de taille 1. Avec cette structure de réseau de neurones, on retrouve les performances obtenues par la version précédente de ppo. Ci dessous, les courbes d'entraînement :
+
+![alt text](rapports/imgs/capture.png)
+
+Ce qui est intéressant de remarquer, c'est qu'avec un simple réseau de convolution, le réseau de neurone est parfaitement capable d'émuler le comportement du réseau de neurone double-chemin. Normalement, on s'attendrai à avoir de meilleurs performances avec un réseau de neurones plus puissant. Or c'est l'inverse qu'on observe ici : Avec un réseau de neurones qui prend plus d'informations en entrée, les performances sont moins bonnes. Et ce n'est pas un problème de données !! En effet, en entraînant plus longtemps, on génère plus de données (on joue plus de parties). Donc il ne peut pas y avoir de problème d'over-fitting. Cependant, on remarque que l'architecture simple (normalement plus puissante) n'arrive pas du tout à la même performance que le réseau double-chemins. Il y a donc un problème fondamental à PPO (et peut-être à toute une classe d'algos d'apprentissage par renforcement) qui l'empèche d'être efficace avec des réseaux de neurones trop gros. 
 
 # TODO :
 
@@ -151,8 +164,8 @@ Ecrire une fonction de reward pour différents skills :
 
 Le RL à proprement parler :
 
-- [ ] Recoder un algo pour entraîner des agents sur une grille
-- [ ] Entraîner des agents à ne pas se rentrer dedans.
+- [x] Recoder un algo pour entraîner des agents sur une grille
+- [x] Entraîner des agents à ne pas se rentrer dedans.
 - [ ] Entraîner des agents à se faire la guerre.
 - [ ] Evaluer les gains par rapport à zéro entraînement.
 - [ ] Faire un premier petit rapport
