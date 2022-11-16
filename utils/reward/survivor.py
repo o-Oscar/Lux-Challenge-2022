@@ -1,11 +1,12 @@
 import numpy as np
 from utils import teams
+from utils.reward.base import BaseRewardGenerator
 
 DEATH_REWARD = -1
 ON_SPAWN_REWARD = -0.1
 
 
-class DefaultRewardGenerator:
+class SurvivorRewardGenerator(BaseRewardGenerator):
     def __init__(self):
         pass
 
@@ -34,14 +35,6 @@ class DefaultRewardGenerator:
                     unit = obs[team]["units"][team][unit_id]
                     if factory_grid[unit["pos"][1], unit["pos"][0]] == 1:
                         cur_reward += ON_SPAWN_REWARD
-
-                # # the unit has gone to the right
-                # cur_reward = 0
-                # if unit_id in actions[team]:
-                #     if np.array_equal(
-                #         actions[team][unit_id], np.array([0, 1, 0, 0, 0])
-                #     ):
-                #         cur_reward += 1
 
                 reward_grid[old_unit["pos"][1], old_unit["pos"][0]] = cur_reward
 

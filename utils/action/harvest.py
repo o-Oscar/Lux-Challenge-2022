@@ -1,9 +1,9 @@
-from utils.action import ActionHandler
+from utils.action.base import BaseActionHandler
 from utils import teams
 import numpy as np
 
 
-class DefaultActionHandler(ActionHandler):
+class HarvestActionHandler(BaseActionHandler):
     def __init__(self):
         super().__init__()
 
