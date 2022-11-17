@@ -10,16 +10,16 @@ class HarvestActionHandler(BaseActionHandler):
 
         self.robot_to_env_actions = [
             None,  # ne rien faire
-            np.array([0, 1, 0, 0, 0]),  # bouger en haut
-            np.array([0, 2, 0, 0, 0]),  # bouger à droite
-            np.array([0, 3, 0, 0, 0]),  # bouger en bas
-            np.array([0, 4, 0, 0, 0]),  # bouger à gauche
-            np.array([1, 0, 0, 100, 0]),  # transférer de la glace
-            np.array([1, 0, 1, 100, 0]),  # transférer des minerais
-            np.array([2, 0, 4, 50, 0]),  # récupérer de la puissance
-            np.array([2, 0, 4, 100, 0]),  # récupérer de la puissance
-            np.array([2, 0, 4, 150, 0]),  # récupérer de la puissance
-            np.array([3, 0, 0, 0, 0]),  # creuser
+            np.array([[0, 1, 0, 0, 0]]),  # bouger en haut
+            np.array([[0, 2, 0, 0, 0]]),  # bouger à droite
+            np.array([[0, 3, 0, 0, 0]]),  # bouger en bas
+            np.array([[0, 4, 0, 0, 0]]),  # bouger à gauche
+            np.array([[1, 0, 0, 100, 0]]),  # transférer de la glace
+            np.array([[1, 0, 1, 100, 0]]),  # transférer des minerais
+            np.array([[2, 0, 4, 50, 0]]),  # récupérer de la puissance
+            np.array([[2, 0, 4, 100, 0]]),  # récupérer de la puissance
+            np.array([[2, 0, 4, 150, 0]]),  # récupérer de la puissance
+            np.array([[3, 0, 0, 0, 0]]),  # creuser
         ]
 
         self.action_nb = len(self.robot_to_env_actions)
