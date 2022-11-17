@@ -53,7 +53,7 @@ class LogWrapper(gym.Wrapper):
 
         return obs
 
-    def save(self, full_save=True, convenient_save=True):
+    def save(self, full_save=True, convenient_save=True, replay_name="replay_custom"):
         if full_save:
             timestr = time.strftime("%Y_%m_%d-%H:%M:%S")
             compressed_path = self.log_path / "compressed" / (timestr + ".json")
@@ -71,7 +71,7 @@ class LogWrapper(gym.Wrapper):
 
         if convenient_save:
             self.compressed_log = to_json(self.compressed_log)
-            with open("replay_custom.json", "w") as f:
+            with open("replays/" + replay_name + ".json", "w") as f:
                 json.dump(self.compressed_log, f)
 
     @property

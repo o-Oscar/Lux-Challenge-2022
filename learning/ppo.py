@@ -37,6 +37,7 @@ class PPOConfig:
     save_path: Path
     device: th.device
     wandb: bool = False
+    name: str = "default"
     epoch_per_save: int = 0
     min_batch_size: int = 32
     update_nb: int = 1000
@@ -77,7 +78,9 @@ def actions_to_env(network_actions, obs):
     return to_return
 
 
-def multi_agent_rollout(env: Env, agent: BaseAgent, device, max_ep_len=1100):
+def multi_agent_rollout(
+    env: Env, agent: BaseAgent, device, max_ep_len=1100, replay_name="replay_custom"
+):
     obs, masks, unit_pos = env.reset()
 
     all_obs = [obs]
@@ -125,7 +128,7 @@ def multi_agent_rollout(env: Env, agent: BaseAgent, device, max_ep_len=1100):
         all_log_prob.append(log_prob)
         all_unit_pos.append(unit_pos)
 
-    env.save(full_save=False, convenient_save=True)
+    env.save(full_save=False, convenient_save=True, replay_name=replay_name)
     # exit()
     # if no_unit:
     #     print("no units !!")
@@ -161,10 +164,11 @@ def get_team_rollout(
 
 
 class ReplayBuffer:
-    def __init__(self, env: Env, agent: BaseAgent, device):
+    def __init__(self, env: Env, agent: BaseAgent, device, name: str):
         self.env = env
         self.agent = agent
         self.device = device
+        self.name = name
 
         self.gamma = 0.99
         self.lamb = 0.95
@@ -179,7 +183,14 @@ class ReplayBuffer:
         self.all_unit_pos = []
 
         while len(self) < batch_size:
-            self.expand(multi_agent_rollout(self.env, self.agent, self.device))
+            self.expand(
+                multi_agent_rollout(
+                    self.env,
+                    self.agent,
+                    self.device,
+                    replay_name="training_" + self.name,
+                )
+            )
 
         self.compute_advantage()
         self.compute_gae()
@@ -371,7 +382,7 @@ def start_ppo(config: PPOConfig):
     agent = config.agent.to(device)
     optimizer = optim.Adam(agent.parameters(), lr=2.5e-4, eps=1e-5)
 
-    buffer = ReplayBuffer(env, agent, device)
+    buffer = ReplayBuffer(env, agent, device, config.name)
 
     start_time = time.time()
 

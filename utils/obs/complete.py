@@ -49,6 +49,8 @@ class CompleteObsGenerator(BaseObsGenerator):
         # time in the day
         full_grid[4] = np.sin(np.pi * 2 * obs[team]["real_env_steps"] / 50)
         full_grid[5] = np.cos(np.pi * 2 * obs[team]["real_env_steps"] / 50)
+        #full_grid[4] = 1 if obs[team]["real_env_steps"] % 50 > 25 else 0
+        #full_grid[5] = 0 if obs[team]["real_env_steps"] % 50 > 25 else 1
 
         # robot specific features
         for i, team in enumerate(teams):

@@ -26,8 +26,11 @@ class Env(gym.Env):
         obs_generator: BaseObsGenerator,
         reward_generator: BaseRewardGenerator,
     ):
+        robots = luxai2022.config.EnvConfig().ROBOTS
+        robots["LIGHT"].MOVE_COST = 0
+        robots["LIGHT"].INIT_POWER = 100
         self.env = LogWrapper(
-            luxai2022.LuxAI2022(validate_action_space=False, verbose=0)
+            luxai2022.LuxAI2022(validate_action_space=False, verbose=0, ROBOTS=robots)
         )
         self.action_handler = action_hanlder
         self.obs_generator = obs_generator

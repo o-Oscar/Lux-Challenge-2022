@@ -4,8 +4,8 @@ from pathlib import Path
 import numpy as np
 import torch as th
 
-from bots.survivor import ACTION_HANDLER, OBS_GENERATOR, REWARD_GENERATOR
-from bots.survivor.agent import Agent
+from bots.survivor_time import ACTION_HANDLER, OBS_GENERATOR, REWARD_GENERATOR
+from bots.survivor_time.agent import Agent
 from learning.ppo import PPOConfig, start_ppo
 from utils.env import Env
 
@@ -19,7 +19,7 @@ def train(args):
     config = PPOConfig(
         env=env,
         agent=agent,
-        save_path=Path("results/survivor") / args.name,
+        save_path=Path("results/survivor_time") / args.name,
         name=args.name,
         wandb=args.wandb,
         epoch_per_save=args.epoch_per_save,
