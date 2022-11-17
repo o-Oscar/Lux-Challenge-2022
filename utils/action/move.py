@@ -10,10 +10,10 @@ class MoveActionHandler(BaseActionHandler):
 
         self.robot_to_env_actions = [
             None,  # ne rien faire
-            np.array([0, 1, 0, 0, 0]),  # bouger en haut
-            np.array([0, 2, 0, 0, 0]),  # bouger à droite
-            np.array([0, 3, 0, 0, 0]),  # bouger en bas
-            np.array([0, 4, 0, 0, 0]),  # bouger à gauche
+            np.array([[0, 1, 0, 0, 0]]),  # bouger en haut
+            np.array([[0, 2, 0, 0, 0]]),  # bouger à droite
+            np.array([[0, 3, 0, 0, 0]]),  # bouger en bas
+            np.array([[0, 4, 0, 0, 0]]),  # bouger à gauche
         ]
 
         self.action_nb = len(self.robot_to_env_actions)

@@ -23,6 +23,7 @@ def train(args):
         wandb=args.wandb,
         epoch_per_save=args.epoch_per_save,
         device=device,
+        min_batch_size=args.min_batch_size,
     )
 
     start_ppo(config)
@@ -47,6 +48,13 @@ if __name__ == "__main__":
         type=int,
         default=0,
         help="Number of epoch between saves.",
+    )
+
+    parser.add_argument(
+        "--min_batch_size",
+        type=int,
+        default=32,
+        help="Min Batch Size.",
     )
 
     args = parser.parse_args()
