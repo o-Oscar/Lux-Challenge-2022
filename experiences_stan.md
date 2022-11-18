@@ -16,6 +16,11 @@ Les expériences suivantes ont eu pour but de faire "danser" les robots en leur 
 => Aucune convergence, ca marche pas du tout et on oscille principalement autour de la reward 0.
 
 
+## SECONDES SALVE D'EXP
+
+- Grâces aux nouveaux générateurs d'observation (notamment `position_time`), les réseaux apprennent à faire danser les robots en les faisant aller de gauche à droite sur des périodes de 25 step (un demi-cycles jours/nuit).
+
+
 ## TODO
 
 Une réfacto du code est nécessaire pour les entraînements. Avoir 4 fichier à modifier (`init`, `agent`, `train` et `evaluate`) tout en gérant les bons import etc, c'est ULTRA fastidieux et permet facilement bcp d'erreur (par exemple quand j'ai dédupliquer `survivor`, j'ai pas titlé sur le coup que je devais changer les import partout pour choper le bon init). Un système de fichier de config clean pourraient vraiment aider, où tout l'agent est décider dedans, tout en ayant à avoir un seul train/evaluate pour tlm quitte à en avoir un relativement compliqué car devant gérer les cas de manières exhaustive

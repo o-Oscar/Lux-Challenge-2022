@@ -5,10 +5,10 @@ from utils.reward.base import BaseRewardGenerator
 
 DEATH_REWARD = -1
 ON_SPAWN_REWARD = -0.1
-MOVE_REWARD = 0.01
+MOVE_REWARD = 0.001
 
 
-class SurvivorMoveRewardGenerator(BaseRewardGenerator):
+class SurvivorMoveTimeRewardGenerator(BaseRewardGenerator):
     def __init__(self):
         pass
 

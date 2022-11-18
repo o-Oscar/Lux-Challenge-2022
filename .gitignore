@@ -13,5 +13,6 @@ viewer/
 wandb/
 results/
 replays/
+clean_replays/
 
 replay*

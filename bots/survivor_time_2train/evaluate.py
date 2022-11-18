@@ -4,8 +4,8 @@ from pathlib import Path
 import numpy as np
 import torch as th
 
-from bots.survivor_position import ACTION_HANDLER, OBS_GENERATOR, REWARD_GENERATOR
-from bots.survivor_position.agent import Agent
+from bots.survivor_time_2train import ACTION_HANDLER, OBS_GENERATOR, REWARD_GENERATOR
+from bots.survivor_time_2train.agent import Agent
 from learning.ppo import multi_agent_rollout
 from utils.env import Env
 
@@ -15,7 +15,7 @@ def evaluate(args):
 
     env = Env(ACTION_HANDLER, OBS_GENERATOR, REWARD_GENERATOR)
     agent = Agent(env)
-    save_path = Path("results/") / "survivor_position" / args.name
+    save_path = Path("results/") / "survivor_time_2train" / args.name
 
     save_path_model = list(sorted(save_path.glob("*"), reverse=True))[0]
 

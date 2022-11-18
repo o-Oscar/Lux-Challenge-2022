@@ -18,17 +18,12 @@ def layer_init(layer, std=np.sqrt(2), bias_const=0.0):
 class ObsHead(nn.Module):
     def __init__(self, env: Env):
         super().__init__()
-        self.grid_head = nn.Conv2d(4, 32, 11, padding="same")
-        self.vector_head = nn.Conv2d(5, 32, 1, padding="same")
+        self.grid_head = nn.Conv2d(2, 128, 11, padding="same")
 
     def forward(self, obs):
-        grid_obs = obs[:, :4]
-        vector_obs = obs[:, 4:]
-
+        grid_obs = obs
         grid_feat = self.grid_head(grid_obs)
-        vector_feat = self.vector_head(vector_obs)
-
-        return th.relu(th.concat([grid_feat, vector_feat], dim=1))
+        return grid_feat
 
 
 class Agent(BaseAgent):
@@ -37,16 +32,16 @@ class Agent(BaseAgent):
         if use_multi_path:
             self.critic = nn.Sequential(
                 ObsHead(env),
-                layer_init(nn.Conv2d(64, 64, 1, padding="same")),
+                layer_init(nn.Conv2d(128, 128, 1, padding="same")),
                 nn.Tanh(),
-                layer_init(nn.Conv2d(64, 1, 1, padding="same"), std=1.0),
+                layer_init(nn.Conv2d(128, 1, 1, padding="same"), std=1.0),
             )
             self.actor = nn.Sequential(
                 ObsHead(env),
-                layer_init(nn.Conv2d(64, 64, 1, padding="same")),
+                layer_init(nn.Conv2d(128, 128, 1, padding="same")),
                 nn.Tanh(),
                 layer_init(
-                    nn.Conv2d(64, env.action_handler.action_nb, 1, padding="same"),
+                    nn.Conv2d(128, env.action_handler.action_nb, 1, padding="same"),
                     std=0.01,
                 ),
             )

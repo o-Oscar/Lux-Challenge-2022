@@ -18,12 +18,12 @@ def layer_init(layer, std=np.sqrt(2), bias_const=0.0):
 class ObsHead(nn.Module):
     def __init__(self, env: Env):
         super().__init__()
-        self.grid_head = nn.Conv2d(4, 64, 11, padding="same")
-        self.vector_head = nn.Conv2d(7, 64, 1, padding="same")
+        self.grid_head = nn.Conv2d(2, 64, 11, padding="same")
+        self.vector_head = nn.Conv2d(2, 64, 1, padding="same")
 
     def forward(self, obs):
-        grid_obs = obs[:, :4]
-        vector_obs = obs[:, 4:]
+        grid_obs = obs[:, :2]
+        vector_obs = obs[:, 2:]
 
         grid_feat = self.grid_head(grid_obs)
         vector_feat = self.vector_head(vector_obs)
