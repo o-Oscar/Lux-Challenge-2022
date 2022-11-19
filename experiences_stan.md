@@ -21,6 +21,13 @@ Les expériences suivantes ont eu pour but de faire "danser" les robots en leur 
 - Grâces aux nouveaux générateurs d'observation (notamment `position_time`), les réseaux apprennent à faire danser les robots en les faisant aller de gauche à droite sur des périodes de 25 step (un demi-cycles jours/nuit).
 
 
+## TROISIEME SALVE D'EXP
+
+- truc à retenir : faire gaffe à la période du sinus pour la reward (ne pas aller au delà)
+- La danse est maintenant plus complexe ! On va en haut à gauche, puis à droite, puis en bas, puis à gauche
+- Se préentrainer à ne pas mourir avant de danser permet de danser plus vite, mais ne permet pas d'avoir de meilleurs performances
+- NB pour la reward : ce n'est pas vraiment un pb mais ca le sera peut-être plus tard : faut-il normaliser en fonction du nombre de factory au départ pour "lisser" la reward (si on a 2 fois plus de facto y a potentiellement 2 fois plus de destruction/de reward de mouvement)
+
 ## TODO
 
 Une réfacto du code est nécessaire pour les entraînements. Avoir 4 fichier à modifier (`init`, `agent`, `train` et `evaluate`) tout en gérant les bons import etc, c'est ULTRA fastidieux et permet facilement bcp d'erreur (par exemple quand j'ai dédupliquer `survivor`, j'ai pas titlé sur le coup que je devais changer les import partout pour choper le bon init). Un système de fichier de config clean pourraient vraiment aider, où tout l'agent est décider dedans, tout en ayant à avoir un seul train/evaluate pour tlm quitte à en avoir un relativement compliqué car devant gérer les cas de manières exhaustive

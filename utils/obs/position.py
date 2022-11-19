@@ -15,6 +15,8 @@ class PositionObsGenerator(BaseObsGenerator):
         super().__init__()
 
         self.channel_nb = 2
+        self.grid_channel_nb = 2
+        self.vector_channel_nb = 0
 
     def calc_obs(self, obs):
         # pre_computation of the full grid features

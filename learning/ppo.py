@@ -17,17 +17,7 @@ from torch.distributions.categorical import Categorical
 import wandb
 from utils import teams
 from utils.env import Env, get_env
-
-
-class BaseAgent(nn.Module):
-    def __init__(self):
-        super().__init__()
-
-    def get_value(self, obs):
-        raise NotImplementedError
-
-    def get_action(self, obs, masks, action=None):
-        raise NotImplementedError
+from utils.agent.base import BaseAgent
 
 
 @dataclasses.dataclass
@@ -373,7 +363,7 @@ def start_ppo(config: PPOConfig):
         config.save_path.mkdir(exist_ok=False, parents=True)
 
     if config.wandb:
-        wandb.init(project="lux_ai_ppo", name=config.save_path.name)
+        wandb.init(project="lux_ai_ppo", name=config.name)
 
     env = config.env
 

@@ -1,5 +1,6 @@
 class BaseActionHandler:
     def __init__(self):
+        self.action_nb: int
         pass
 
     def calc_masks(self, obs):

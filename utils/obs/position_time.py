@@ -15,6 +15,8 @@ class PositionTimeObsGenerator(BaseObsGenerator):
         super().__init__()
 
         self.channel_nb = 4
+        self.grid_channel_nb = 2
+        self.vector_channel_nb = 2
 
     def calc_obs(self, obs):
         # pre_computation of the full grid features
@@ -26,8 +28,8 @@ class PositionTimeObsGenerator(BaseObsGenerator):
                 full_grid[i, unit["pos"][1], unit["pos"][0]] = 1
 
         # time in the day
-        full_grid[2] = np.sin(np.pi * 2 * obs[team]["real_env_steps"] / 50)
-        full_grid[3] = np.cos(np.pi * 2 * obs[team]["real_env_steps"] / 50)
+        full_grid[2] = np.sin(np.pi * 2 * obs[team]["real_env_steps"] / 100)
+        full_grid[3] = np.cos(np.pi * 2 * obs[team]["real_env_steps"] / 100)
 
         # invert the allied/opponent channels
         second_player_grid = full_grid.copy()

@@ -1,125 +1,68 @@
-import time
-
-import gym
-import numpy as np
-import torch as th
-import torch.nn as nn
-from utils.env import get_env, Env
-from utils import teams
-import itertools
-import wandb
+import argparse
 from pathlib import Path
-from learning.ppo import (
-    Agent,
-    obs_to_network,
-    mask_to_network,
-    actions_to_env,
-    multi_agent_rollout,
-)
+
+import torch as th
+
+from utils.bots import Bot
+from utils.env import Env
+
+from learning.ppo import multi_agent_rollout
 
 
-def multi_agent_rollout_deterministic(env: Env, agent: Agent, max_ep_len=1100):
-    obs, masks = env.reset()
+def evaluate(args):
+    device = th.device("cuda" if th.cuda.is_available() else "cpu")
 
-    all_obs = [obs]
-    all_rewards = []
-    all_masks = [masks]
-    all_actions = []
-    all_log_prob = []
-    all_values = []
+    bot = Bot(args.bot_type)
+    agent = bot.agent
 
-    no_unit = False
+    env = Env(bot.action, bot.obs_generator, bot.reward_generators[-1])
 
-    for t in range(max_ep_len):
-        network_obs = obs_to_network(obs, device)
-        # no_unit = no_unit or network_obs["grid"].shape[0] == 0
+    if len(bot.reward_update_nbs) > 1:
+        if args.num_reward == -1:
+            num_reward = len(bot.reward_update_nbs)
+        save_path = (
+            Path("results") / args.bot_type / ((args.name) + "_rew_" + str(num_reward))
+        )
+        replay_name = args.bot_type + "_" + args.name + "_rew_" + str(num_reward)
 
-        if network_obs["grid"].shape[0] > 0:
-            network_masks = mask_to_network(masks, device)
-            actions, log_prob, _, value = agent.get_greedy_action(
-                network_obs, network_masks
-            )
-            actions = actions_to_env(actions, obs)
-            log_prob = actions_to_env(log_prob, obs)
-            value = actions_to_env(value, obs)
-        else:
-            actions = {team: {} for team in teams}
-            log_prob = {team: {} for team in teams}
-            value = {team: {} for team in teams}
+    else:
+        save_path = Path("results") / args.bot_type / args.name
+        replay_name = args.bot_type + "_" + args.name
 
-        obs, rewards, masks, done = env.step(actions)
+    save_path_model = list(sorted(save_path.glob("*")))[-1]
 
-        all_values.append(value)
+    agent.load_state_dict(th.load(save_path_model))
+    agent.to(device)
+    agent.eval()
 
-        if done:
-            break
+    multi_agent_rollout(env, agent, device, replay_name=replay_name)
 
-        all_obs.append(obs)
-        all_actions.append(actions)
-        all_rewards.append(rewards)
-        all_masks.append(masks)
-        all_log_prob.append(log_prob)
-
-    env.save(full_save=False, convenient_save=True)
-    # if no_unit:
-    #     print("no units !!")
-    #     exit()
-
-    return {
-        "obs": all_obs,
-        "actions": all_actions,
-        "rewards": all_rewards,
-        "masks": all_masks,
-        "logprob": all_log_prob,
-        "values": all_values,
-    }
-
-
-save_path = Path("results/models/survivor")
-
-
-MC_NB = 4
 
 if __name__ == "__main__":
 
-    device = th.device("cuda" if th.cuda.is_available() else "cpu")
+    parser = argparse.ArgumentParser()
 
-    env = get_env()
+    parser.add_argument(
+        "--bot_type",
+        type=str,
+        default="default",
+        help="Type of the Bot.",
+    )
 
-    agent = Agent(env).to(device)
+    parser.add_argument(
+        "--name",
+        type=str,
+        default="",
+        help="Name of the run. Used to get the last version of the bot.",
+    )
 
-    all_model_names = sorted(save_path.glob("*"))
+    parser.add_argument(
+        "--num_reward",
+        type=int,
+        default=-1,
+        help="Number of the reward to evaluate for this bot",
+    )
 
-    all_test_models = all_model_names[::5]
+    args = parser.parse_args()
 
-    for model_name in all_test_models:
-        print("Test model name :", model_name)
-
-        agent.load_state_dict(th.load(model_name))
-        agent.eval()
-
-        for i in range(MC_NB):
-            rollout = multi_agent_rollout_deterministic(env, agent)
-            # rollout = multi_agent_rollout(env, agent, device)
-
-            all_agents = set()
-            for team in teams:
-                for obs in rollout["obs"]:
-                    for unit_id in obs[team].keys():
-                        all_agents.add(unit_id)
-
-            all_agents = sorted(all_agents, key=lambda x: int(x[5:]))
-
-            surviving_agents = set()
-            for team in teams:
-                for unit_id in rollout["obs"][-1][team].keys():
-                    surviving_agents.add(unit_id)
-            surviving_agents = sorted(surviving_agents, key=lambda x: int(x[5:]))
-
-            print(
-                "Survivors : {}/{} = {:.02f}".format(
-                    len(surviving_agents),
-                    len(all_agents),
-                    len(surviving_agents) / len(all_agents),
-                )
-            )
+    evaluate(args)

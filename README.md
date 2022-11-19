@@ -6,7 +6,12 @@
 
 Pour lancer un entraînement :
 ```
-python -m bots.survivor.train -h
+python -m learning.train -h
+```
+
+Pour évaluer un bot :
+```
+python -m learning.evaluate -h
 ```
 
 ## Etapes cleef de developpement qui nous permettent de dire qu'on a fait des progrès
