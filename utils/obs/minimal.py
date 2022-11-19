@@ -55,9 +55,9 @@ class MinimalObsGenerator(BaseObsGenerator):
                 full_grid[5, unit["pos"][1], unit["pos"][0]] = ore_feat
                 full_grid[6, unit["pos"][1], unit["pos"][0]] = power_feat
 
-                # time in the day
-                full_grid[7] = np.sin(np.pi * 2 * obs[team]["real_env_steps"] / 50)
-                full_grid[8] = np.cos(np.pi * 2 * obs[team]["real_env_steps"] / 50)
+        # time in the day
+        full_grid[7] = np.sin(np.pi * 2 * obs[team]["real_env_steps"] / 50)
+        full_grid[8] = np.cos(np.pi * 2 * obs[team]["real_env_steps"] / 50)
 
         # invert the allied/opponent channels
         second_player_grid = full_grid.copy()
