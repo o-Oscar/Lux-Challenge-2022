@@ -25,10 +25,15 @@ class Env(gym.Env):
         action_hanlder: BaseActionHandler,
         obs_generator: BaseObsGenerator,
         reward_generator: BaseRewardGenerator,
+        power_cost: bool = False,
     ):
         robots = luxai2022.config.EnvConfig().ROBOTS
-        robots["LIGHT"].MOVE_COST = 0
-        robots["LIGHT"].INIT_POWER = 100
+
+        if not power_cost:
+            robots["LIGHT"].MOVE_COST = 0
+            robots["LIGHT"].INIT_POWER = 1000
+            robots["LIGHT"].BATTERY_CAPACITY = 1000
+
         self.env = LogWrapper(
             luxai2022.LuxAI2022(validate_action_space=False, verbose=0, ROBOTS=robots)
         )

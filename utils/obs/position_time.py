@@ -7,8 +7,8 @@ from utils.obs.base import BaseObsGenerator
 class PositionTimeObsGenerator(BaseObsGenerator):
     """
     Observations contain :
-        - time
         - position of each robot
+        - time
     """
 
     def __init__(self):

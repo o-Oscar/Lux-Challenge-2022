@@ -15,7 +15,6 @@ Les expériences suivantes ont eu pour but de faire "danser" les robots en leur 
 - Pour `time`, ils vont vers la gauche comme le demande la première phase mais ne retourne pas ver la droite après, et bcp de robot meurt en étant "plaquer" contre le mur de gauche. J'ai essayé d'augmentre la taille des couches convolutionnelles (64 au lieu de 32), d'avoir une observation binaire sur le temps au lieu d'une sinusoide (basé sur mes cycles droite/gauche, pas les cycles jours/nuit).
 => Aucune convergence, ca marche pas du tout et on oscille principalement autour de la reward 0.
 
-
 ## SECONDES SALVE D'EXP
 
 - Grâces aux nouveaux générateurs d'observation (notamment `position_time`), les réseaux apprennent à faire danser les robots en les faisant aller de gauche à droite sur des périodes de 25 step (un demi-cycles jours/nuit).
@@ -28,6 +27,8 @@ Les expériences suivantes ont eu pour but de faire "danser" les robots en leur 
 - Se préentrainer à ne pas mourir avant de danser permet de danser plus vite, mais ne permet pas d'avoir de meilleurs performances
 - NB pour la reward : ce n'est pas vraiment un pb mais ca le sera peut-être plus tard : faut-il normaliser en fonction du nombre de factory au départ pour "lisser" la reward (si on a 2 fois plus de facto y a potentiellement 2 fois plus de destruction/de reward de mouvement)
 
-## TODO
 
-Une réfacto du code est nécessaire pour les entraînements. Avoir 4 fichier à modifier (`init`, `agent`, `train` et `evaluate`) tout en gérant les bons import etc, c'est ULTRA fastidieux et permet facilement bcp d'erreur (par exemple quand j'ai dédupliquer `survivor`, j'ai pas titlé sur le coup que je devais changer les import partout pour choper le bon init). Un système de fichier de config clean pourraient vraiment aider, où tout l'agent est décider dedans, tout en ayant à avoir un seul train/evaluate pour tlm quitte à en avoir un relativement compliqué car devant gérer les cas de manières exhaustive
+## QUATRIEME SALVE D'EXP
+
+Le but ici était d'avoir les robot collecter les resources. Le problème est la compétition entre eux, car ils ne savent pas à l'avance ce que leurs voisins vont faire. Une première solution est d'augmenter le `kernel_size` des dernières couches de l'agent, voir de dédoubler la dérnière couche (décision en 2 temps) Malheuresement cela ne suffit pas et ne permet que d'améliorer la vitesse d'apprentissage en début d'entrainement.
+Consernant les résultat finaux : les robots se répartissent globalement sur les bonnes cases, mais "refusent" d'avoir des voisins, et se positionnent donc en diagonal les uns des autres, formant une disposition non optimale.

@@ -8,13 +8,12 @@ from utils.agent.conv import ConvAgent
 from utils.obs.base import BaseObsGenerator
 from utils.obs.position import PositionObsGenerator
 from utils.obs.position_time import PositionTimeObsGenerator
+from utils.obs.position_ice_ore import PositionIceOreObsGenerator
 
 from utils.reward.base import BaseRewardGenerator
 from utils.reward.survivor_move import SurvivorMoveRewardGenerator
 from utils.reward.survivor_dance import SurvivorDanceRewardGenerator
-
-
-Bot_List = ["survivor", "dance", "big_dance", "dance_2train"]
+from utils.reward.thirsty import ThirstyRewardGenerator
 
 
 class Bot:
@@ -25,25 +24,48 @@ class Bot:
     reward_update_nbs: list  # limits of step for each reward (sequential learning)
 
     def __init__(self, bot_type: str):
-        if bot_type not in Bot_List:
-            print("Bot not created, he must be in", Bot_List)
-            raise ValueError
 
-        if bot_type == "survivor":
-            self.action = MoveActionHandler()
-            self.obs_generator = PositionObsGenerator()
+        if bot_type == "thirsty_FK1_FL1":
+            self.action = HarvestActionHandler()
+            self.obs_generator = PositionIceOreObsGenerator()
             self.agent = ConvAgent(self.obs_generator, self.action)
-            self.reward_generators = [SurvivorMoveRewardGenerator()]
+            self.reward_generators = [ThirstyRewardGenerator()]
             self.reward_update_nbs = [1000]
 
-        if bot_type == "dance":
+        elif bot_type == "thirsty_FK5_FL1":
+            self.action = HarvestActionHandler()
+            self.obs_generator = PositionIceOreObsGenerator()
+            self.agent = ConvAgent(self.obs_generator, self.action, final_kernel_size=5)
+            self.reward_generators = [ThirstyRewardGenerator()]
+            self.reward_update_nbs = [1000]
+
+        elif bot_type == "thirsty_FK5_FL2":
+            self.action = HarvestActionHandler()
+            self.obs_generator = PositionIceOreObsGenerator()
+            self.agent = ConvAgent(
+                self.obs_generator, self.action, final_kernel_size=5, final_layers_nb=2
+            )
+            self.reward_generators = [ThirstyRewardGenerator()]
+            self.reward_update_nbs = [1000]
+
+        elif bot_type == "dance_2train":
+            self.action = MoveActionHandler()
+            self.obs_generator = PositionTimeObsGenerator()
+            self.agent = ConvAgent(self.obs_generator, self.action)
+            self.reward_generators = [
+                SurvivorMoveRewardGenerator(),
+                SurvivorDanceRewardGenerator(),
+            ]
+            self.reward_update_nbs = [100, 1000]
+
+        elif bot_type == "dance":
             self.action = MoveActionHandler()
             self.obs_generator = PositionTimeObsGenerator()
             self.agent = ConvAgent(self.obs_generator, self.action)
             self.reward_generators = [SurvivorDanceRewardGenerator()]
             self.reward_update_nbs = [1000]
 
-        if bot_type == "big_dance":
+        elif bot_type == "big_dance":
             self.action = MoveActionHandler()
             self.obs_generator = PositionTimeObsGenerator()
             self.agent = (
@@ -59,12 +81,13 @@ class Bot:
             self.reward_generators = [SurvivorDanceRewardGenerator()]
             self.reward_update_nbs = [1000]
 
-        if bot_type == "dance_2train":
+        elif bot_type == "survivor":
             self.action = MoveActionHandler()
-            self.obs_generator = PositionTimeObsGenerator()
+            self.obs_generator = PositionObsGenerator()
             self.agent = ConvAgent(self.obs_generator, self.action)
-            self.reward_generators = [
-                SurvivorMoveRewardGenerator(),
-                SurvivorDanceRewardGenerator(),
-            ]
-            self.reward_update_nbs = [100, 1000]
+            self.reward_generators = [SurvivorMoveRewardGenerator()]
+            self.reward_update_nbs = [1000]
+
+        else:
+            print("Bot not created")
+            raise ValueError

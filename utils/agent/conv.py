@@ -36,17 +36,26 @@ class ObsHead(nn.Module):
             raise ValueError
 
         if self.grid_channel_nb > 0:
-            grid_layers = []
-            for _ in range(grid_layers_nb):
+            grid_layers = [
+                nn.Conv2d(
+                    self.grid_channel_nb,
+                    inside_dim // 2,
+                    grid_kernel_size,
+                    padding="same",
+                ),
+                nn.Tanh(),
+            ]
+            for _ in range(grid_layers_nb - 1):
                 grid_layers.append(
                     nn.Conv2d(
-                        self.grid_channel_nb,
+                        inside_dim // 2,
                         inside_dim // 2,
                         grid_kernel_size,
                         padding="same",
                     )
                 )
                 grid_layers.append(nn.Tanh())
+            grid_layers.pop()
             self.grid_head = nn.Sequential(*grid_layers)
         else:
             self.grid_head = None
@@ -83,35 +92,76 @@ class ConvAgent(BaseAgent):
         inside_dim=64,
         grid_kernel_size=11,
         grid_layers_nb=1,
-        post_obs_layers_nb=2,
+        inside_kernel_size=1,
+        inside_layers_nb=1,
+        final_kernel_size=1,
+        final_layers_nb=1,
     ):
         super().__init__()
+
+        # Obs Layers
         critic_layers = [
             ObsHead(obs_generator, inside_dim, grid_kernel_size, grid_layers_nb)
         ]
         actor_layers = [
             ObsHead(obs_generator, inside_dim, grid_kernel_size, grid_layers_nb)
         ]
-        for _ in range(post_obs_layers_nb):
+
+        # Inside Layers
+        for _ in range(inside_layers_nb):
             critic_layers.append(
-                layer_init(nn.Conv2d(inside_dim, inside_dim, 1, padding="same"))
+                layer_init(
+                    nn.Conv2d(
+                        inside_dim, inside_dim, inside_kernel_size, padding="same"
+                    )
+                )
             )
             critic_layers.append(nn.Tanh())
 
             actor_layers.append(
-                layer_init(nn.Conv2d(inside_dim, inside_dim, 1, padding="same"))
+                layer_init(
+                    nn.Conv2d(
+                        inside_dim, inside_dim, inside_kernel_size, padding="same"
+                    )
+                )
             )
             actor_layers.append(nn.Tanh())
 
+        # Final Layers
         critic_layers.append(
-            layer_init(nn.Conv2d(inside_dim, 1, 1, padding="same"), std=1.0)
+            layer_init(
+                nn.Conv2d(inside_dim, 1, final_kernel_size, padding="same"), std=1.0
+            )
         )
         actor_layers.append(
             layer_init(
-                nn.Conv2d(inside_dim, action_handler.action_nb, 1, padding="same"),
+                nn.Conv2d(
+                    inside_dim,
+                    action_handler.action_nb,
+                    final_kernel_size,
+                    padding="same",
+                ),
                 std=0.01,
             )
         )
+
+        for _ in range(final_layers_nb - 1):
+            critic_layers.append(nn.Tanh())
+            critic_layers.append(
+                layer_init(nn.Conv2d(1, 1, final_kernel_size, padding="same"))
+            )
+
+            actor_layers.append(nn.Tanh())
+            actor_layers.append(
+                layer_init(
+                    nn.Conv2d(
+                        action_handler.action_nb,
+                        action_handler.action_nb,
+                        final_kernel_size,
+                        padding="same",
+                    )
+                )
+            )
 
         self.critic = nn.Sequential(*critic_layers)
         self.actor = nn.Sequential(*actor_layers)
