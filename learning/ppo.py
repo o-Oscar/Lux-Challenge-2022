@@ -20,6 +20,9 @@ from utils.env import Env, get_env
 from utils.agent.base import BaseAgent
 
 
+LEARNING_BATCH_SIZE = 50
+
+
 @dataclasses.dataclass
 class PPOConfig:
     agent: BaseAgent
@@ -415,9 +418,11 @@ def start_ppo(config: PPOConfig):
 
         print("| Learning ", end="", flush=True)
 
-        for epoch in range(4):
+        nb_epoch = len(buffer) // LEARNING_BATCH_SIZE
+
+        for epoch in range(nb_epoch):
             for obs, act, logprob, gae, masks, rets in buffer.sample(
-                batch_size=len(buffer) // 4
+                batch_size=LEARNING_BATCH_SIZE
             ):
                 obs = obs.to(device)
                 act = act.to(device)
