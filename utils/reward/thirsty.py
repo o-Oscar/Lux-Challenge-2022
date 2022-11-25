@@ -4,7 +4,7 @@ from utils.reward.base import BaseRewardGenerator
 
 DEATH_REWARD = -1
 ON_SPAWN_REWARD = -0.1
-GATHER_REWARD = 0.01
+GATHER_REWARD = 0.1
 
 
 class ThirstyRewardGenerator(BaseRewardGenerator):
@@ -15,7 +15,7 @@ class ThirstyRewardGenerator(BaseRewardGenerator):
 
         to_return = {}
 
-        ice_ore_grid = obs["player_0"]["board"]["ice"] + obs["player_0"]["board"]["ore"]
+        ice = obs["player_0"]["board"]["ice"]
 
         for team in teams:
             factory_grid = np.zeros(obs["player_0"]["board"]["ice"].shape)
@@ -39,10 +39,10 @@ class ThirstyRewardGenerator(BaseRewardGenerator):
                     if factory_grid[unit["pos"][1], unit["pos"][0]] == 1:
                         cur_reward += ON_SPAWN_REWARD
 
-                    # is the unit on an ice/ore case
-
+                    # is the unit gathering ice and does it have cargo available
                     if (
-                        ice_ore_grid[unit["pos"][1], unit["pos"][0]] != 0
+                        ice[unit["pos"][1], unit["pos"][0]] != 0
+                        and unit["cargo"]["ice"] < 100
                         and unit_id in actions[team]
                         and (
                             actions[team][unit_id] == np.array([[3, 0, 0, 0, 0]])

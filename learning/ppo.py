@@ -102,6 +102,10 @@ def multi_agent_rollout(
         #     actions = {team: {} for team in teams}
         #     log_prob = {team: {} for team in teams}
         #     value = {team: {} for team in teams}
+        for team in teams:
+            value[team] = value[team].detach().cpu()
+            actions[team] = actions[team].detach().cpu()
+            log_prob[team] = log_prob[team].detach().cpu()
 
         obs, rewards, masks, done, unit_pos = env.step(actions)
         # print(np.min(rewards[teams[0]]), np.max(rewards[teams[0]]))
@@ -110,7 +114,6 @@ def multi_agent_rollout(
 
         if done:
             break
-
         all_obs.append(obs)
         all_actions.append(actions)
         all_rewards.append(rewards)
@@ -172,6 +175,7 @@ class ReplayBuffer:
         self.all_values = []
         self.all_unit_pos = []
 
+        nb_games = 0
         while len(self) < batch_size:
             self.expand(
                 multi_agent_rollout(
@@ -181,9 +185,10 @@ class ReplayBuffer:
                     replay_name="training_" + self.name,
                 )
             )
-
+            nb_games += 1
         self.compute_advantage()
         self.compute_gae()
+        return nb_games
 
     def expand(self, rollout):
         for team in teams:
@@ -200,7 +205,7 @@ class ReplayBuffer:
         for game_id in range(len(self.all_rewards)):
             game_advantages = []
             for t in range(len(self.all_rewards[game_id])):
-                rew = th.tensor(self.all_rewards[game_id][t], device=self.device)
+                rew = th.tensor(self.all_rewards[game_id][t])
                 prec_value = self.all_values[game_id][t]
                 new_value = prec_value * 0
                 if t + 1 < len(self.all_unit_pos[game_id]):
@@ -303,11 +308,11 @@ class ReplayBuffer:
         ret_obs = np.stack(ret_obs)
         ret_masks = np.stack(ret_masks)
 
-        ret_obs = th.tensor(ret_obs, device=self.device, dtype=th.float32)
+        ret_obs = th.tensor(ret_obs, dtype=th.float32)
         ret_actions = th.stack(ret_actions).detach()
         ret_logprob = th.stack(ret_logprob).detach()
         ret_gae = th.stack(ret_gae).detach()
-        ret_masks = th.tensor(ret_masks, device=self.device, dtype=th.float32)
+        ret_masks = th.tensor(ret_masks, dtype=th.float32)
         ret_returns = th.stack(ret_returns).detach()
 
         # print("shapes")
@@ -405,7 +410,7 @@ def start_ppo(config: PPOConfig):
         mean_ratio.reset()
         mean_reward.reset()
 
-        buffer.fill(config.min_batch_size)
+        nb_games = buffer.fill(config.min_batch_size)
         # exit()
 
         print("| Learning ", end="", flush=True)
@@ -414,6 +419,12 @@ def start_ppo(config: PPOConfig):
             for obs, act, logprob, gae, masks, rets in buffer.sample(
                 batch_size=len(buffer) // 4
             ):
+                obs = obs.to(device)
+                act = act.to(device)
+                logprob = logprob.to(device)
+                gae = gae.to(device)
+                masks = masks.to(device)
+                rets = rets.to(device)
 
                 _, newlogprob, entropy, newvalue = agent.get_action(obs, masks, act)
                 logratio = newlogprob - logprob
@@ -472,7 +483,6 @@ def start_ppo(config: PPOConfig):
                 )
                 explained_variance.update(explained_var, n)
                 mean_ratio.update(m_mean(ratio, robot_mask), n)
-
         to_log = {}
 
         # mean reward computation
@@ -481,7 +491,8 @@ def start_ppo(config: PPOConfig):
             m = np.array(mask)
             m = np.max(m, axis=1)[:-1]
             r = np.array(rew)
-            mean_rew += np.sum(m * r) / np.sum(m) / len(teams)
+            # mean_rew += np.sum(m * r) / np.sum(m) / len(teams)
+            mean_rew += np.sum(m * r) / np.sum(m) / len(teams) / nb_games
 
         # logging
         to_log["main/mean_reward"] = mean_rew

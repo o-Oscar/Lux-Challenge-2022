@@ -1,6 +1,7 @@
 from utils.action.base import BaseActionHandler
 from utils.action.move import MoveActionHandler
 from utils.action.harvest import HarvestActionHandler
+from utils.action.harvest_transfer import HarvestTransferActionHandler
 
 from utils.agent.base import BaseAgent
 from utils.agent.conv import ConvAgent
@@ -9,11 +10,13 @@ from utils.obs.base import BaseObsGenerator
 from utils.obs.position import PositionObsGenerator
 from utils.obs.position_time import PositionTimeObsGenerator
 from utils.obs.position_ice_ore import PositionIceOreObsGenerator
+from utils.obs.position_ice_factory import PositionIceFactoryObsGenerator
 
 from utils.reward.base import BaseRewardGenerator
 from utils.reward.survivor_move import SurvivorMoveRewardGenerator
 from utils.reward.survivor_dance import SurvivorDanceRewardGenerator
 from utils.reward.thirsty import ThirstyRewardGenerator
+from utils.reward.factory_survivor import FactorySurvivorRewardGenerator
 
 
 class Bot:
@@ -25,7 +28,26 @@ class Bot:
 
     def __init__(self, bot_type: str):
 
-        if bot_type == "thirsty_FK1_FL1":
+        # FACTORY SURVIVOR
+        if bot_type == "factory_survivor_2train":
+            self.action = HarvestTransferActionHandler()
+            self.obs_generator = PositionIceFactoryObsGenerator()
+            self.agent = ConvAgent(self.obs_generator, self.action, final_kernel_size=5)
+            self.reward_generators = [
+                ThirstyRewardGenerator(),
+                FactorySurvivorRewardGenerator(),
+            ]
+            self.reward_update_nbs = [100, 1000]
+
+        elif bot_type == "factory_survivor":
+            self.action = HarvestTransferActionHandler()
+            self.obs_generator = PositionIceFactoryObsGenerator()
+            self.agent = ConvAgent(self.obs_generator, self.action, final_kernel_size=5)
+            self.reward_generators = [FactorySurvivorRewardGenerator()]
+            self.reward_update_nbs = [1000]
+
+        # THIRSTY
+        elif bot_type == "thirsty_FK1_FL1":
             self.action = HarvestActionHandler()
             self.obs_generator = PositionIceOreObsGenerator()
             self.agent = ConvAgent(self.obs_generator, self.action)
@@ -48,6 +70,7 @@ class Bot:
             self.reward_generators = [ThirstyRewardGenerator()]
             self.reward_update_nbs = [1000]
 
+        # DANCE
         elif bot_type == "dance_2train":
             self.action = MoveActionHandler()
             self.obs_generator = PositionTimeObsGenerator()
@@ -81,6 +104,7 @@ class Bot:
             self.reward_generators = [SurvivorDanceRewardGenerator()]
             self.reward_update_nbs = [1000]
 
+        # SURVIVOR
         elif bot_type == "survivor":
             self.action = MoveActionHandler()
             self.obs_generator = PositionObsGenerator()

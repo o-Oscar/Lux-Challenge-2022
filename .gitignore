@@ -14,5 +14,6 @@ wandb/
 results/
 replays/
 clean_replays/
+old_replays/
 
 replay*

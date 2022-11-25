@@ -37,7 +37,7 @@ def train(args):
                 wandb=args.wandb,
                 epoch_per_save=args.epoch_per_save,
                 device=device,
-                min_batch_size=1,
+                min_batch_size=args.min_batch_size,
                 update_nb=reward_update_nb,
             )
             start_ppo(config)
@@ -52,7 +52,7 @@ def train(args):
             wandb=args.wandb,
             epoch_per_save=args.epoch_per_save,
             device=device,
-            min_batch_size=1,
+            min_batch_size=args.min_batch_size,
             update_nb=bot.reward_update_nbs[0],
         )
         start_ppo(config)
@@ -100,6 +100,13 @@ if __name__ == "__main__":
         type=int,
         default=0,
         help="Number of rewards to skip in the training of the bot",
+    )
+
+    parser.add_argument(
+        "--min_batch_size",
+        type=int,
+        default=1,
+        help="Mini Batch Size",
     )
 
     args = parser.parse_args()
