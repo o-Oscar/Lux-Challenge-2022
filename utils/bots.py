@@ -29,15 +29,12 @@ class Bot:
     def __init__(self, bot_type: str):
 
         # FACTORY SURVIVOR
-        if bot_type == "factory_survivor_2train":
+        if bot_type == "factory_survivor_pretrain":
             self.action = HarvestTransferActionHandler()
             self.obs_generator = PositionIceFactoryObsGenerator()
             self.agent = ConvAgent(self.obs_generator, self.action, final_kernel_size=5)
-            self.reward_generators = [
-                ThirstyRewardGenerator(),
-                FactorySurvivorRewardGenerator(),
-            ]
-            self.reward_update_nbs = [100, 1000]
+            self.reward_generators = [ThirstyRewardGenerator()]
+            self.reward_update_nbs = [1000]
 
         elif bot_type == "factory_survivor":
             self.action = HarvestTransferActionHandler()

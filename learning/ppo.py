@@ -20,7 +20,7 @@ from utils.env import Env, get_env
 from utils.agent.base import BaseAgent
 
 
-LEARNING_BATCH_SIZE = 50
+LEARNING_BATCH_SIZE = 300
 
 
 @dataclasses.dataclass
@@ -166,7 +166,7 @@ class ReplayBuffer:
         self.device = device
         self.name = name
 
-        self.gamma = 0.99
+        self.gamma = 0.999
         self.lamb = 0.95
 
     def fill(self, batch_size: int):

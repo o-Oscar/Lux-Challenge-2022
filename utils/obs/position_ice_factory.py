@@ -11,14 +11,19 @@ class PositionIceFactoryObsGenerator(BaseObsGenerator):
         - distance to each factory
         - position of ice
         - ice of each robot
+        - ice fullyness of each robot
     """
 
-    def __init__(self):
+    def __init__(self, heavy_robot: bool = True):
         super().__init__()
 
-        self.channel_nb = 6
-        self.grid_channel_nb = 5
-        self.vector_channel_nb = 1
+        self.channel_nb = 7
+        self.grid_channel_nb = 7
+        self.vector_channel_nb = 0
+        if heavy_robot:
+            self.cargo_space = 1000
+        else:
+            self.cargo_space = 100
 
     def calc_obs(self, obs):
         # pre_computation of the full grid features
@@ -49,9 +54,13 @@ class PositionIceFactoryObsGenerator(BaseObsGenerator):
         # robot ice cargot
         for i, team in enumerate(teams):
             for unit_name, unit in obs[team]["units"][team].items():
+                # ice fullyness
+                if unit["cargo"]["ice"] == self.cargo_space:
+                    full_grid[5, unit["pos"][1], unit["pos"][0]] = 1
+
                 # ice
-                full_grid[5, unit["pos"][1], unit["pos"][0]] = (
-                    unit["cargo"]["ice"] / 100
+                full_grid[6, unit["pos"][1], unit["pos"][0]] = (
+                    unit["cargo"]["ice"] / self.cargo_space
                 )
 
         # invert the allied/opponent channels

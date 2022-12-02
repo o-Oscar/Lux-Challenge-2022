@@ -5,8 +5,16 @@ from utils.action.base import BaseActionHandler
 
 
 class HarvestTransferActionHandler(BaseActionHandler):
-    def __init__(self):
+    def __init__(
+        self,
+        heavy_robot: bool = True,
+    ):
         super().__init__()
+
+        if heavy_robot:
+            self.cargo_space = 1000
+        else:
+            self.cargo_space = 100
 
         self.robot_to_env_actions = [
             None,  # ne rien faire
@@ -14,7 +22,7 @@ class HarvestTransferActionHandler(BaseActionHandler):
             np.array([[0, 2, 0, 0, 0]]),  # bouger à droite
             np.array([[0, 3, 0, 0, 0]]),  # bouger en bas
             np.array([[0, 4, 0, 0, 0]]),  # bouger à gauche
-            np.array([[1, 0, 0, 100, 0]]),  # transférer de la glace
+            np.array([[1, 0, 0, self.cargo_space, 0]]),  # transférer de la glace
             np.array([[3, 0, 0, 0, 0]]),  # creuser
         ]
 
@@ -55,7 +63,7 @@ class HarvestTransferActionHandler(BaseActionHandler):
                     mask[4] = 0
                 # ice transfer not possible when we have no ice or we are not on top of a factory
                 if (
-                    unit["cargo"]["ice"] < 100
+                    unit["cargo"]["ice"] < self.cargo_space
                     or factory_mask[unit["pos"][1], unit["pos"][0]] == 0
                 ):
                     mask[5] = 0

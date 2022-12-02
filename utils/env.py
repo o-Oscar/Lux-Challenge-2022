@@ -26,13 +26,21 @@ class Env(gym.Env):
         obs_generator: BaseObsGenerator,
         reward_generator: BaseRewardGenerator,
         power_cost: bool = False,
+        heavy_robot: bool = True,
     ):
         robots = luxai2022.config.EnvConfig().ROBOTS
 
         if not power_cost:
             robots["LIGHT"].MOVE_COST = 0
+            robots["LIGHT"].DIG_COST = 0
             robots["LIGHT"].INIT_POWER = 1000
             robots["LIGHT"].BATTERY_CAPACITY = 1000
+
+            robots["HEAVY"].MOVE_COST = 0
+            robots["HEAVY"].RUBBLE_MOVEMENT_COST = 0
+            robots["HEAVY"].DIG_COST = 0
+            robots["HEAVY"].INIT_POWER = 1000
+            robots["HEAVY"].BATTERY_CAPACITY = 1000
 
         self.env = LogWrapper(
             luxai2022.LuxAI2022(validate_action_space=False, verbose=0, ROBOTS=robots)
@@ -40,6 +48,7 @@ class Env(gym.Env):
         self.action_handler = action_hanlder
         self.obs_generator = obs_generator
         self.reward_generator = reward_generator
+        self.heavy_robot = heavy_robot
 
     def calc_unit_pos(self, obs):
         to_return = {team: {} for team in teams}
@@ -97,14 +106,19 @@ class Env(gym.Env):
 
     def factory_actions(self):
         """
-        Create a light robot when possible. Takes into account factory power, metal cargo and weather.
+        Create a heavy/light robot when possible. Takes into account factory power, metal cargo and weather.
         """
         actions = {
             "player_0": {},
             "player_1": {},
         }
 
-        light_config = self.env.env_cfg.ROBOTS["LIGHT"]
+        if self.heavy_robot:
+            config = self.env.env_cfg.ROBOTS["HEAVY"]
+            action = 1
+        else:
+            config = self.env.env_cfg.ROBOTS["LIGHT"]
+            action = 0
 
         if self.env.state.weather_schedule[self.env.state.real_env_steps] == 2:
             power_fac = self.env_cfg.WEATHER["COLD_SNAP"]["POWER_CONSUMPTION"]
@@ -114,10 +128,10 @@ class Env(gym.Env):
         for team in teams:
             for factory_name, factory in self.env.state.factories[team].items():
                 if (
-                    factory.power >= light_config.POWER_COST * power_fac
-                    and factory.cargo.metal >= light_config.METAL_COST
+                    factory.power >= config.POWER_COST * power_fac
+                    and factory.cargo.metal >= config.METAL_COST
                 ):
-                    actions[team][factory_name] = 0
+                    actions[team][factory_name] = action
 
         return actions
 
