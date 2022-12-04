@@ -98,7 +98,9 @@ def multi_agent_rollout(env: Env, agent: BaseAgent, device, max_ep_len=1100):
         #     print(th.where(th.tensor(masks[teams[0]], device=device, dtype=th.float32)))
 
         network_masks = mask_to_network(masks, device)
-        actions, log_prob, _, value = agent.get_action(network_obs, network_masks)
+        actions, log_prob, _, value = agent.get_action(
+            network_obs, network_masks, device=device
+        )
         actions = actions_to_env(actions, obs)
         log_prob = actions_to_env(log_prob, obs)
         value = actions_to_env(value, obs)

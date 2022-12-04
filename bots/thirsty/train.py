@@ -5,6 +5,7 @@ import numpy as np
 import torch as th
 
 from bots.thirsty.agent import Agent
+from bots.thirsty.cond_agent import CondAgent
 from learning.ppo import PPOConfig, start_ppo
 from utils.action.move import MoveActionHandler
 from utils.env import Env
@@ -20,12 +21,15 @@ def train(args):
     reward_generator = ThirstyReward()
 
     env = Env(action_handler, obs_generator, reward_generator)
-    agent = Agent(env)
+    if args.pixelcnn:
+        agent = CondAgent(env)
+    else:
+        agent = Agent(env)
 
     config = PPOConfig(
         env=env,
         agent=agent,
-        save_path=Path("results/survivor") / args.name,
+        save_path=Path("results/models") / args.name,
         wandb=args.wandb,
         epoch_per_save=args.epoch_per_save,
         device=device,
@@ -61,6 +65,11 @@ if __name__ == "__main__":
         type=int,
         default=32,
         help="Min Batch Size.",
+    )
+    parser.add_argument(
+        "--pixelcnn",
+        action="store_true",
+        help="Whether to use a pixel-cnn style actor.",
     )
 
     args = parser.parse_args()
