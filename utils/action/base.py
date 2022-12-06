@@ -1,6 +1,6 @@
 class BaseActionHandler:
     def __init__(self):
-        pass
+        self.action_nb = 0
 
     def calc_masks(self, obs):
         raise NotImplementedError

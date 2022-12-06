@@ -1,20 +1,21 @@
-import gym
-from gym import spaces
-import numpy as np
-
-import luxai2022
-from luxai_runner.utils import to_json
-from pathlib import Path
 import json
 import pickle
 import time
+from pathlib import Path
+
+import gym
+import luxai2022
 import luxai2022.config
 import luxai2022.state
+import numpy as np
+from gym import spaces
+from luxai_runner.utils import to_json
+
 from utils import teams
 from utils.action.base import BaseActionHandler
+from utils.log_wrapper import LogWrapper
 from utils.obs.base import BaseObsGenerator
 from utils.reward.base import BaseRewardGenerator
-from utils.log_wrapper import LogWrapper
 
 DEFAULT_LOG_PATH = Path("results/logs/")
 
@@ -25,9 +26,10 @@ class Env(gym.Env):
         action_hanlder: BaseActionHandler,
         obs_generator: BaseObsGenerator,
         reward_generator: BaseRewardGenerator,
+        **kwargs
     ):
         self.env = LogWrapper(
-            luxai2022.LuxAI2022(validate_action_space=False, verbose=0)
+            luxai2022.LuxAI2022(validate_action_space=False, verbose=0, **kwargs)
         )
         self.action_handler = action_hanlder
         self.obs_generator = obs_generator
@@ -40,9 +42,9 @@ class Env(gym.Env):
                 to_return[team][unit_id] = unit["pos"]
         return to_return
 
-    def reset(self):
+    def reset(self, **kwargs):
 
-        obs = self.env.reset()
+        obs = self.env.reset(**kwargs)
 
         # bid phase
         actions = {

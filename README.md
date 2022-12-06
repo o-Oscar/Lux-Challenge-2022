@@ -146,14 +146,11 @@ Ensuite, on passe la concaténation des outputs de ces deux layers dans une sér
 
 Ce qui est intéressant de remarquer, c'est qu'avec un simple réseau de convolution, le réseau de neurone est parfaitement capable d'émuler le comportement du réseau de neurone double-chemin. Normalement, on s'attendrai à avoir de meilleurs performances avec un réseau de neurones plus puissant. Or c'est l'inverse qu'on observe ici : Avec un réseau de neurones qui prend plus d'informations en entrée, les performances sont moins bonnes. Et ce n'est pas un problème de données !! En effet, en entraînant plus longtemps, on génère plus de données (on joue plus de parties). Donc il ne peut pas y avoir de problème d'over-fitting. Cependant, on remarque que l'architecture simple (normalement plus puissante) n'arrive pas du tout à la même performance que le réseau double-chemins. Il y a donc un problème fondamental à PPO (et peut-être à toute une classe d'algos d'apprentissage par renforcement) qui l'empèche d'être efficace avec des réseaux de neurones trop gros. 
 
+# Approche par diffusion
+
+pour tenter de résoudre le problème de "compétition" entre agents, on va essayer de mettre en place une méthode de diffusion.
+
 # TODO :
-
-Créer un environnement pour commencer à entraîner des trucs
-
-- [ ] Faire le ménage quand nécessaire
-- [x] Retourner la carte d'observation (une par team).
-- [x] Retourner la map de mask d'actions (une par team). 
-- [x] Retourner la map de rewards (une par team). Les rewards sont distribués sur les cases des robots à l'observation de départ
 
 Ecrire une fonction de reward pour différents skills :
 
@@ -170,8 +167,9 @@ Ecrire une fonction de reward pour différents skills :
 
 Le RL à proprement parler :
 
-- [x] Recoder un algo pour entraîner des agents sur une grille
-- [x] Entraîner des agents à ne pas se rentrer dedans.
+- [ ] Coder un algo de q learning pour apprendre la q fonction d'une policy
+- [ ] Entraîner des agents à ne pas se rentrer dedans.
+- [ ] Entraîner des agents à aller sur des cases d'eau.
 - [ ] Entraîner des agents à se faire la guerre.
 - [ ] Evaluer les gains par rapport à zéro entraînement.
 - [ ] Faire un premier petit rapport

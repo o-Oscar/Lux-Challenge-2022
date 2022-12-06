@@ -1,16 +1,15 @@
-import gym
-from gym import spaces
-import numpy as np
-
-import luxai2022
-from luxai_runner.utils import to_json
-from pathlib import Path
 import json
 import pickle
 import time
+from pathlib import Path
+
+import gym
+import luxai2022
 import luxai2022.config
 import luxai2022.state
-
+import numpy as np
+from gym import spaces
+from luxai_runner.utils import to_json
 
 DEFAULT_LOG_PATH = Path("results/logs/")
 
@@ -43,7 +42,7 @@ class LogWrapper(gym.Wrapper):
         # if self.compressed_log or self.full_log:
         #     self.save()
 
-        obs = self.env.reset()
+        obs = self.env.reset(**kwargs)
 
         self.state_obs = self.env.state.get_compressed_obs()
         self.compressed_log = dict(observations=[], actions=[])
@@ -53,7 +52,9 @@ class LogWrapper(gym.Wrapper):
 
         return obs
 
-    def save(self, full_save=True, convenient_save=True):
+    def save(
+        self, full_save=True, convenient_save=True, convenient_name="replay_custom"
+    ):
         if full_save:
             timestr = time.strftime("%Y_%m_%d-%H:%M:%S")
             compressed_path = self.log_path / "compressed" / (timestr + ".json")
@@ -71,7 +72,7 @@ class LogWrapper(gym.Wrapper):
 
         if convenient_save:
             self.compressed_log = to_json(self.compressed_log)
-            with open("replay_custom.json", "w") as f:
+            with open(convenient_name + ".json", "w") as f:
                 json.dump(self.compressed_log, f)
 
     @property
