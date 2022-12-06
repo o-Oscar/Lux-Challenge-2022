@@ -40,7 +40,7 @@ class DqnConfig:
     wandb: bool = False
     gamma: float = 0.99
     epoch_per_save: int = 0
-    update_nb: int = 1000
+    update_nb: int = 300
 
 
 def obs_to_network(obs, device):
@@ -71,7 +71,7 @@ def actions_to_env(network_actions):
     return to_return
 
 
-def multi_agent_rollout(env: Env, agent: BaseAgent, device, max_ep_len=5):
+def multi_agent_rollout(env: Env, agent: BaseAgent, device, max_ep_len=1100):
     obs, masks, unit_pos = env.reset(seed=42)
 
     all_obs = []
@@ -85,9 +85,9 @@ def multi_agent_rollout(env: Env, agent: BaseAgent, device, max_ep_len=5):
 
         network_masks = mask_to_network(masks, device)
         actions = agent.sample_actions(network_obs, network_masks)
-        actions = th.tensor(
-            np.random.randint(0, 5, size=actions.shape), dtype=th.long, device=device
-        )
+        # actions = th.tensor(
+        #     np.random.randint(0, 5, size=actions.shape), dtype=th.long, device=device
+        # )
         actions = actions_to_env(actions)
 
         new_obs, rewards, new_mask, done, new_unit_pos = env.step(actions)
@@ -154,13 +154,13 @@ class ReplayBuffer:
         self.agent = agent
         self.device = device
 
+    def fill(self, batch_size: int):
+
         self.all_obs = []
         self.all_actions = []
         self.all_rewards = []
         self.all_masks = []
         self.all_unit_pos = []
-
-    def fill(self, batch_size: int):
 
         cur_size = len(self)
 
@@ -175,17 +175,54 @@ class ReplayBuffer:
             self.all_masks.append(get_team_rollout(rollout, "masks", team))
             self.all_unit_pos.append(get_team_rollout(rollout, "unit_pos", team))
 
+    def calc_a_target(self, agent: BaseAgent, tau=1):
+        with th.no_grad():
+            all_action_weights = []
+            all_potential_actions = []
+            for obs, masks, rewards, done in self.sample_targets(10):
+                all_q = []
+                all_act = []
+                for i in range(10):
+                    act = agent.sample_actions(obs, masks)
+                    all_act.append(act.detach().cpu().numpy())
+                    all_q.append(agent.q_eval(obs, act, masks).detach().cpu().numpy())
+                all_q = np.stack(all_q, axis=0) / tau  # batch, timestep, feats
+                eadv = np.exp(all_q - np.max(all_q, axis=0, keepdims=True))
+                act_weights = eadv / np.sum(eadv, axis=0, keepdims=True)
+                all_action_weights.append(act_weights)
+                all_act = np.stack(all_act, axis=0)  # batch, timestep, feats
+                all_potential_actions.append(all_act)
+                # for i in range(32):
+                #     if np.any(masks[i, :, 16, 11].detach().cpu().numpy()):
+                #         print(all_act[:, i, 16, 11], act_weights[:, i, 16, 11])
+
+            all_action_weights = np.concatenate(all_action_weights, axis=1)
+            all_potential_actions = np.concatenate(all_potential_actions, axis=1)
+
+            self.all_action_weights = []
+            self.all_potential_actions = []
+            count = 0
+            for i in range(len(self.all_actions)):
+                cur_action_weights = []
+                cur_potential_actions = []
+                for t in range(len(self.all_actions[i])):
+                    cur_action_weights.append(all_action_weights[:, count])
+                    cur_potential_actions.append(all_potential_actions[:, count])
+                    count += 1
+                self.all_action_weights.append(cur_action_weights)
+                self.all_potential_actions.append(cur_potential_actions)
+
     def calc_q_target(self, agent: BaseAgent):
         with th.no_grad():
-            to_save = []
+            all_mean_q = []
             for obs, masks, rewards, done in self.sample_targets(10):
                 all_q = []
                 for i in range(10):
                     act = agent.sample_actions(obs, masks)
                     all_q.append(agent.q_eval(obs, act, masks).detach().cpu().numpy())
                 mean_q = np.mean(np.stack(all_q), axis=0)
-                to_save.append(mean_q)
-            to_save = np.concatenate(to_save, axis=0)
+                all_mean_q.append(mean_q)
+            all_mean_q = np.concatenate(all_mean_q, axis=0)
 
             self.all_q_target = []
             count = 0
@@ -197,7 +234,7 @@ class ReplayBuffer:
                         q_target = q_target + map_robots_grids(
                             self.all_unit_pos[i][t],
                             self.all_unit_pos[i][t + 1],
-                            mean_q[count + 1],
+                            all_mean_q[count + 1],
                         )
                     cur_q_targets.append(q_target)
                     count += 1
@@ -269,6 +306,9 @@ class ReplayBuffer:
         done = []
         targets = []
 
+        potential_actions = []
+        action_weights = []
+
         for id in ids:
             obs.append(self.all_obs[id[0]][id[1]])
             robot_pos.append(self.all_unit_pos[id[0]][id[1]])
@@ -284,12 +324,18 @@ class ReplayBuffer:
 
             targets.append(self.all_q_target[id[0]][id[1]])
 
+            ai = np.random.randint(10)
+            potential_actions.append(self.all_potential_actions[id[0]][id[1]][ai])
+            action_weights.append(self.all_action_weights[id[0]][id[1]][ai])
+
         obs = np.stack(obs, axis=0)
         actions = np.stack(actions, axis=0)
         new_obs = np.stack(new_obs, axis=0)
         masks = np.stack(masks, axis=0)
         new_masks = np.stack(new_masks, axis=0)
         targets = np.stack(targets, axis=0)
+        potential_actions = np.stack(potential_actions, axis=0)
+        action_weights = np.stack(action_weights, axis=0)
 
         obs = th.tensor(obs, device=self.device, dtype=th.float32)
         actions = th.tensor(actions, device=self.device, dtype=th.float32)
@@ -302,6 +348,11 @@ class ReplayBuffer:
 
         targets = th.tensor(targets, device=self.device, dtype=th.float32)
 
+        potential_actions = th.tensor(
+            potential_actions, device=self.device, dtype=th.float32
+        )
+        action_weights = th.tensor(action_weights, device=self.device, dtype=th.float32)
+
         return (
             obs,
             robot_pos,
@@ -313,6 +364,8 @@ class ReplayBuffer:
             rewards,
             done,
             targets,
+            potential_actions,
+            action_weights,
         )
 
 
@@ -346,8 +399,8 @@ def start_dqn(config: DqnConfig):
 
     # if config.epoch_per_save > 0 and config.save_path.is_dir():
     #     raise NameError("Save folder already exists. Default is to not override")
-    # if config.epoch_per_save > 0:
-    #     config.save_path.mkdir(exist_ok=False, parents=True)
+    if config.epoch_per_save > 0:
+        config.save_path.mkdir(exist_ok=True, parents=True)
 
     if config.wandb:
         wandb.init(project="lux_ai_ppo", name=config.save_path.name)
@@ -357,8 +410,8 @@ def start_dqn(config: DqnConfig):
     device = config.device
 
     agent = config.agent.to(device)
+    agent.q_network.load_state_dict(th.load("results/models/default_init/0000"))
     target_agent = config.target_agent.to(device)
-    target_agent.load_state_dict(agent.state_dict())
 
     optimizer = optim.Adam(agent.parameters(), lr=2.5e-4, eps=1e-5)
 
@@ -366,30 +419,61 @@ def start_dqn(config: DqnConfig):
 
     start_time = time.time()
 
-    q_loss = MeanLogger()
+    q_loss_log = MeanLogger()
+    a_loss_log = MeanLogger()
     mean_ratio = MeanLogger()
-    mean_reward = MeanLogger()
+    mean_reward_log = MeanLogger()
 
-    buffer.fill(256)
-    # buffer.fill(1024)
-    buffer.calc_q_target(target_agent)
+    # print("Computing a targets")
 
     for update in range(config.update_nb):
 
-        start_time = time.time()
-        print("Update {} | Trajs computation ".format(update), end="", flush=True)
+        target_agent.load_state_dict(agent.state_dict())
 
-        if config.epoch_per_save > 0 and (update + 1) % config.epoch_per_save == 0:
-            model_name = "{:04d}".format(update * 0)
-            th.save(agent.state_dict(), config.save_path / model_name)
+        print("filling buffer")
+        buffer.fill(256)
+        # buffer.fill(1024)
 
-        q_loss.reset()
+        re_sum = 0
+        re_n = 0
+        for i in range(len(buffer.all_rewards)):
+            for t in range(len(buffer.all_rewards[i])):
+                m = np.max(buffer.all_masks[i][t], axis=0)
+                if np.sum(m) > 0:
+                    re_sum += np.sum(m * buffer.all_rewards[i][t]) / np.sum(m)
+                    re_n += 1
+        mean_reward = re_sum / re_n
+        print("current_reward : {}".format(mean_reward))
 
-        # exit()
+        tau = np.exp(np.log(1e-2) * update / 30)
 
-        print("| Learning ", end="", flush=True)
+        print("Computing a targets")
+        buffer.calc_a_target(target_agent, tau)
 
-        for epoch in range(1):
+        print("Computing q targets")
+        buffer.calc_q_target(target_agent)
+
+        for epoch in range(100):
+            start_time = time.time()
+            print(
+                "Update {} Epoch {} | Trajs computation ".format(update, epoch),
+                end="",
+                flush=True,
+            )
+
+            if config.epoch_per_save > 0 and (update + 1) % config.epoch_per_save == 0:
+                q_network_name = "q_network_{:04d}".format(update * 0)
+                th.save(agent.q_network.state_dict(), config.save_path / q_network_name)
+                actor_name = "actor_{:04d}".format(update * 0)
+                th.save(agent.actor.state_dict(), config.save_path / actor_name)
+
+            q_loss_log.reset()
+            a_loss_log.reset()
+
+            # exit()
+
+            print("| Learning ", end="", flush=True)
+
             for (
                 obs,
                 robot_pos,
@@ -401,6 +485,8 @@ def start_dqn(config: DqnConfig):
                 rewards,
                 done,
                 q_target,
+                potential_actions,
+                action_weights,
             ) in buffer.sample(batch_size=32):
 
                 # with th.no_grad():
@@ -414,45 +500,80 @@ def start_dqn(config: DqnConfig):
                 #     )
 
                 q_pred = agent.q_eval(obs, actions, masks)
-                loss = m_mean(th.square(q_pred - q_target), th.max(masks, dim=1).values)
+                q_loss = m_mean(
+                    th.square(q_pred - q_target), th.max(masks, dim=1).values
+                )
 
+                a_target = agent.to_one_hot(potential_actions)
+                logits = agent.a_loss(obs, a_target, masks)
+                # a_target = a_target * 0
+                # a_target[:, 0] = 1
+                probas = th.softmax(logits, dim=1)
+                # print(probas.shape)
+                # action_weights = a_target[:, 1]
+                w = action_weights.view(
+                    (
+                        action_weights.shape[0],
+                        1,
+                        action_weights.shape[1],
+                        action_weights.shape[2],
+                    )
+                )
+                a_loss = m_mean(-w * a_target * th.log(probas), masks)
+
+                # a_loss = m_mean(
+                #     th.square(logits - a_target),
+                #     th.max(masks, dim=1, keepdim=True).values,
+                # )
+
+                # for i in range(32):
+                #     print()
+
+                # for i in range(32):
+                #     if np.any(masks[i, :, 16, 11].detach().cpu().numpy()):
+                #         print(potential_actions[i, 16, 11], action_weights[i, 16, 11])
+
+                loss = q_loss + a_loss
                 loss.backward()
                 optimizer.step()
                 optimizer.zero_grad()
 
-                q_loss.update(loss.item())
+                q_loss_log.update(q_loss.item())
+                a_loss_log.update(a_loss.item())
 
-        to_log = {}
+            to_log = {}
 
-        # mean reward computation
-        mean_rew = 0
-        for rew, mask in zip(buffer.all_rewards, buffer.all_masks):
-            m = np.array(mask)
-            m = np.max(m, axis=1)
-            r = np.array(rew)
-            mean_rew += np.sum(m * r) / np.sum(m) / len(teams)
+            # mean reward computation
+            mean_rew = 0
+            for rew, mask in zip(buffer.all_rewards, buffer.all_masks):
+                m = np.array(mask)
+                m = np.max(m, axis=1)
+                r = np.array(rew)
+                mean_rew += np.sum(m * r) / np.sum(m) / len(teams)
 
-        # logging
-        to_log["main/q_loss"] = q_loss.value
+            # logging
+            to_log["main/q_loss"] = q_loss_log.value
+            to_log["main/a_loss"] = a_loss_log.value
+            to_log["main/rollout_reward"] = mean_reward
 
-        # if q_loss.value < 1e-5:
-        #     buffer.fill(70)
-        #     buffer.calc_q_target(target_agent)
+            # if q_loss.value < 1e-5:
+            #     buffer.fill(70)
+            #     buffer.calc_q_target(target_agent)
 
-        # to_log["main/value_loss"] = value_loss.value
+            # to_log["main/value_loss"] = value_loss.value
 
-        # to_log["infos/policy_loss"] = policy_loss.value
-        # to_log["infos/policy_loss"] = policy_loss.value
-        # to_log["infos/entropy"] = entropy_logger.value
-        # to_log["infos/approx_kl"] = approx_kl_logger.value
-        # to_log["infos/clipfrac"] = clipfrac_logger.value
-        # to_log["infos/explained_variance"] = explained_variance.value
-        # to_log["infos/mean_ratio"] = mean_ratio.value
+            # to_log["infos/policy_loss"] = policy_loss.value
+            # to_log["infos/policy_loss"] = policy_loss.value
+            # to_log["infos/entropy"] = entropy_logger.value
+            # to_log["infos/approx_kl"] = approx_kl_logger.value
+            # to_log["infos/clipfrac"] = clipfrac_logger.value
+            # to_log["infos/explained_variance"] = explained_variance.value
+            # to_log["infos/mean_ratio"] = mean_ratio.value
 
-        if config.wandb:
-            wandb.log(to_log)
+            if config.wandb:
+                wandb.log(to_log)
 
-        print("| Done ({:.03f}s)".format(time.time() - start_time))
+            print("| Done ({:.03f}s)".format(time.time() - start_time))
 
-        if not config.wandb:
-            print(to_log)
+            if not config.wandb:
+                print(to_log)

@@ -18,8 +18,8 @@ def train(args):
 
     action_handler = MoveActionHandler()
     obs_generator = CompleteObsGenerator()
-    # reward_generator = ThirstyReward()
-    reward_generator = SurvivorRewardGenerator()
+    reward_generator = ThirstyReward()
+    # reward_generator = SurvivorRewardGenerator()
 
     env = Env(action_handler, obs_generator, reward_generator)
 

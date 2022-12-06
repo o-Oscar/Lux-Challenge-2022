@@ -1,3 +1,4 @@
+import matplotlib.pyplot as plt
 import numpy as np
 import torch as th
 
@@ -21,7 +22,8 @@ grid_action = np.zeros((48, 48))
 # compute the q value
 device = th.device("cuda" if th.cuda.is_available() else "cpu")
 agent = Agent(env, device).to(device)
-agent.load_state_dict(th.load("results/models/default/0000"))
+agent.q_network.load_state_dict(th.load("results/models/default/q_network_0000"))
+agent.actor.load_state_dict(th.load("results/models/default/actor_0000"))
 
 obs = th.tensor(full_obs["player_0"], dtype=th.float32, device=device).view(
     1, 11, 48, 48
@@ -33,3 +35,18 @@ act[0, 16, 11] = 0
 print(obs.shape, act.shape)
 
 print(agent.q_eval(obs, act, masks)[0, 16, 11])
+
+
+all_values = []
+for i in range(10):
+    all_values.append(
+        agent.sample_actions(obs.repeat(100, 1, 1, 1), masks.repeat(100, 1, 1, 1))[
+            :, 16, 11
+        ]
+        .detach()
+        .cpu()
+        .numpy()
+    )
+all_values = np.concatenate(all_values)
+plt.hist(all_values)
+plt.show()

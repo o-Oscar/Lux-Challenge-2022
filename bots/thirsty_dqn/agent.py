@@ -66,7 +66,11 @@ class Agent(BaseAgent):
         )
 
         self.actor = nn.Sequential(
-            nn.Conv2d(n_obs + n_act + 1, n_act, 3, padding="same"),
+            nn.Conv2d(n_obs + n_act + 1, 64, 3, padding="same"),
+            nn.ReLU(),
+            nn.Conv2d(64, 64, 3, padding="same"),
+            nn.ReLU(),
+            nn.Conv2d(64, n_act, 3, padding="same"),
         )
 
         self.all_x0 = []
@@ -138,7 +142,7 @@ class Agent(BaseAgent):
         ) * th.log(t)
 
         inp = th.concat([obs, act, t_inp], dim=1)
-        logits = self.actor(inp) * 0
+        logits = self.actor(inp)
         return logits
 
     def q_eval(self, obs, act, masks):
@@ -149,3 +153,19 @@ class Agent(BaseAgent):
 
         inp = th.concat([obs, hot_act], dim=1)
         return self.q_network(inp).view((inp.shape[0], inp.shape[2], inp.shape[3]))
+
+    def a_loss(self, obs, act, masks):
+        ts = np.exp(np.random.uniform(-2, 0, size=(act.shape[0], 1, 1, 1)) * np.log(10))
+        ts = th.tensor(ts, dtype=th.float32, device=self.device)
+        xt = self.cat_sample(apply_qt(act, ts))
+        logits = self.calc_logits(obs, xt * masks, ts)
+        return logits
+
+    def to_one_hot(self, act):
+        return (
+            nn.functional.one_hot(
+                act.type(th.long), num_classes=self.env.action_handler.action_nb
+            )
+            .type(th.float32)
+            .permute((0, 3, 1, 2))
+        )
