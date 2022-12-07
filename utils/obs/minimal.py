@@ -36,12 +36,12 @@ class MinimalObsGenerator(BaseObsGenerator):
         # unit pos
         for team in teams:
             for unit in obs[team]["units"][team].values():
-                full_grid[2, unit["pos"][1], unit["pos"][0]] = 1
+                full_grid[2, unit["pos"][0], unit["pos"][1]] = 1
 
         # factory pos
         for team in teams:
             for factory in obs[team]["factories"][team].values():
-                full_grid[3, factory["pos"][1], factory["pos"][0]] = 1
+                full_grid[3, factory["pos"][0], factory["pos"][1]] = 1
 
         # robot specific features
         for i, team in enumerate(teams):
@@ -51,9 +51,9 @@ class MinimalObsGenerator(BaseObsGenerator):
                 ice_feat = unit["cargo"]["ice"] / 100
                 ore_feat = unit["cargo"]["ore"] / 100
                 power_feat = unit["power"] / 150
-                full_grid[4, unit["pos"][1], unit["pos"][0]] = ice_feat
-                full_grid[5, unit["pos"][1], unit["pos"][0]] = ore_feat
-                full_grid[6, unit["pos"][1], unit["pos"][0]] = power_feat
+                full_grid[4, unit["pos"][0], unit["pos"][1]] = ice_feat
+                full_grid[5, unit["pos"][0], unit["pos"][1]] = ore_feat
+                full_grid[6, unit["pos"][0], unit["pos"][1]] = power_feat
 
         # time in the day
         full_grid[7] = np.sin(np.pi * 2 * obs[team]["real_env_steps"] / 50)

@@ -27,8 +27,8 @@ class MoveActionHandler(BaseActionHandler):
             factory_mask = np.zeros(obs["player_0"]["board"]["ice"].shape)
             for factory in obs[team]["factories"][team].values():
                 factory_mask[
-                    factory["pos"][1] - 1 : factory["pos"][1] + 2,
                     factory["pos"][0] - 1 : factory["pos"][0] + 2,
+                    factory["pos"][1] - 1 : factory["pos"][1] + 2,
                 ] = 1
 
             team_mask = np.zeros(
@@ -40,19 +40,19 @@ class MoveActionHandler(BaseActionHandler):
                 mask = np.ones(self.action_nb)
 
                 # up action not possible when on the top of the board
-                if unit["pos"][1] == 0:
+                if unit["pos"][0] == 0:
                     mask[1] = 0
                 # right action not possible when on the right of the board
-                if unit["pos"][0] == obs[team]["board"]["ice"].shape[0] - 1:
+                if unit["pos"][1] == obs[team]["board"]["ice"].shape[1] - 1:
                     mask[2] = 0
                 # down action not possible when on the bottom of the board
-                if unit["pos"][1] == obs[team]["board"]["ice"].shape[1] - 1:
+                if unit["pos"][0] == obs[team]["board"]["ice"].shape[0] - 1:
                     mask[3] = 0
                 # left action not possible when on the left of the board
-                if unit["pos"][0] == 0:
+                if unit["pos"][1] == 0:
                     mask[4] = 0
 
-                team_mask[:, unit["pos"][1], unit["pos"][0]] = mask
+                team_mask[:, unit["pos"][0], unit["pos"][1]] = mask
 
             to_return[team] = team_mask
 
@@ -62,7 +62,7 @@ class MoveActionHandler(BaseActionHandler):
         to_return = {team: {} for team in teams}
         for team in teams:
             for unit_name, unit in obs[team]["units"][team].items():
-                unit_action = network_actions[team][unit["pos"][1], unit["pos"][0]]
+                unit_action = network_actions[team][unit["pos"][0], unit["pos"][1]]
                 cur_action = self.robot_to_env_actions[unit_action]
                 if cur_action is not None:
                     to_return[team][unit_name] = cur_action

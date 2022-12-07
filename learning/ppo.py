@@ -149,7 +149,7 @@ def map_robots_grid(robot_pos, next_robot_pos, new_value):
     for robot_id, next_pos in next_robot_pos.items():
         if robot_id in robot_pos:
             cur_pos = robot_pos[robot_id]
-            to_return[cur_pos[1], cur_pos[0]] = new_value[next_pos[1], next_pos[0]]
+            to_return[cur_pos[0], cur_pos[1]] = new_value[next_pos[0], next_pos[1]]
     return to_return
 
 

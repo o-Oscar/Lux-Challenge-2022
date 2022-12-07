@@ -1,4 +1,5 @@
 import numpy as np
+
 from utils import teams
 from utils.reward.base import BaseRewardGenerator
 
@@ -18,7 +19,7 @@ class SurvivorRewardGenerator(BaseRewardGenerator):
             factory_grid = np.zeros(obs["player_0"]["board"]["ice"].shape)
 
             for factory in obs[team]["factories"][team].values():
-                factory_grid[factory["pos"][1], factory["pos"][0]] = 1
+                factory_grid[factory["pos"][0], factory["pos"][1]] = 1
 
             reward_grid = np.zeros(obs["player_0"]["board"]["ice"].shape)
 
@@ -33,10 +34,10 @@ class SurvivorRewardGenerator(BaseRewardGenerator):
                 # is the unit in the middle of a factory (where other units could spawn)
                 if unit_id in obs[team]["units"][team]:
                     unit = obs[team]["units"][team][unit_id]
-                    if factory_grid[unit["pos"][1], unit["pos"][0]] == 1:
+                    if factory_grid[unit["pos"][0], unit["pos"][1]] == 1:
                         cur_reward += ON_SPAWN_REWARD
 
-                reward_grid[old_unit["pos"][1], old_unit["pos"][0]] = cur_reward
+                reward_grid[old_unit["pos"][0], old_unit["pos"][1]] = cur_reward
 
             to_return[team] = reward_grid
 

@@ -36,12 +36,12 @@ class CompleteObsGenerator(BaseObsGenerator):
         # unit pos
         for i, team in enumerate(teams):
             for unit in obs[team]["units"][team].values():
-                full_grid[2 + i, unit["pos"][1], unit["pos"][0]] = 1
+                full_grid[2 + i, unit["pos"][0], unit["pos"][1]] = 1
 
         # factory pos
         for i, team in enumerate(teams):
             for factory in obs[team]["factories"][team].values():
-                full_grid[4 + i, factory["pos"][1], factory["pos"][0]] = 1
+                full_grid[4 + i, factory["pos"][0], factory["pos"][1]] = 1
 
         # delta to factories
         # all_x = np.arange(obs["player_0"]["board"]["ice"].shape[0])
@@ -64,9 +64,9 @@ class CompleteObsGenerator(BaseObsGenerator):
                 ice_feat = unit["cargo"]["ice"] / 100
                 ore_feat = unit["cargo"]["ore"] / 100
                 power_feat = unit["power"] / 150
-                full_grid[6, unit["pos"][1], unit["pos"][0]] = ice_feat
-                full_grid[7, unit["pos"][1], unit["pos"][0]] = ore_feat
-                full_grid[8, unit["pos"][1], unit["pos"][0]] = power_feat
+                full_grid[6, unit["pos"][0], unit["pos"][1]] = ice_feat
+                full_grid[7, unit["pos"][0], unit["pos"][1]] = ore_feat
+                full_grid[8, unit["pos"][0], unit["pos"][1]] = power_feat
 
         # time in the day
         full_grid[9] = np.sin(np.pi * 2 * obs[team]["real_env_steps"] / 50)

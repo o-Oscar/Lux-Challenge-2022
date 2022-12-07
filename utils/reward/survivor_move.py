@@ -1,12 +1,11 @@
 import numpy as np
+
 from utils import teams
 from utils.reward.base import BaseRewardGenerator
-
 
 DEATH_REWARD = -1
 ON_SPAWN_REWARD = -0.1
 MOVE_REWARD = 0.1
-
 
 
 class SurvivorMoveRewardGenerator(BaseRewardGenerator):
@@ -21,7 +20,7 @@ class SurvivorMoveRewardGenerator(BaseRewardGenerator):
             factory_grid = np.zeros(obs["player_0"]["board"]["ice"].shape)
 
             for factory in obs[team]["factories"][team].values():
-                factory_grid[factory["pos"][1], factory["pos"][0]] = 1
+                factory_grid[factory["pos"][0], factory["pos"][1]] = 1
 
             reward_grid = np.zeros(obs["player_0"]["board"]["ice"].shape)
 
@@ -35,10 +34,10 @@ class SurvivorMoveRewardGenerator(BaseRewardGenerator):
 
                 # the unit has moved
                 if unit_id in actions[team]:
-                    if actions[team][unit_id] is not None :
+                    if actions[team][unit_id] is not None:
                         cur_reward += MOVE_REWARD
 
-                reward_grid[old_unit["pos"][1], old_unit["pos"][0]] = cur_reward
+                reward_grid[old_unit["pos"][0], old_unit["pos"][1]] = cur_reward
 
             to_return[team] = reward_grid
 

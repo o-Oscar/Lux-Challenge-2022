@@ -56,28 +56,32 @@ class Env(gym.Env):
         # factory positionning phase
 
         n_factories = obs["player_0"]["board"]["factories_per_team"]
+
+        valid_pos = np.where(obs["player_0"]["board"]["valid_spawns_mask"])
+        n_valid = int(np.sum(obs["player_0"]["board"]["valid_spawns_mask"]))
+        fac_pos = []
+        for i in range(n_factories * 2):
+            pos_id = int(n_valid * (i + 1) / (n_factories * 2 + 1))
+            fac_pos.append((valid_pos[0][pos_id], valid_pos[1][pos_id]))
+
         for i in range(n_factories):
-            actions = {}
-            for team in teams:
-                spawns = obs[team]["board"]["spawns"][team]
-                m, M = np.min(spawns, axis=0), np.max(spawns, axis=0)
-                delta = M - m
-                main_axis = np.argmax(delta)
-                main_size = np.max(delta)
-                main_pos = int((i + 1) / (n_factories + 1) * main_size)
-                sub_pos = int(delta[1 - main_axis] / 2)
-                pos = m + np.array(
-                    [main_pos, sub_pos] if main_axis == 0 else [sub_pos, main_pos]
-                )
+            for j, team in enumerate(teams):
+                actions = {t: {} for t in teams}
+                # [print(k) for k, v in obs[team]["board"].items()]
+                # import matplotlib.pyplot as plt
+
+                # plt.imshow(obs[team]["board"]["valid_spawns_mask"])
+                # plt.show()
+                # exit()
                 actions[team] = {
-                    "spawn": list(pos),
+                    "spawn": list(fac_pos[2 * i + j]),
                     "metal": self.env.env_cfg.INIT_WATER_METAL_PER_FACTORY,
                     "water": self.env.env_cfg.INIT_WATER_METAL_PER_FACTORY,
                 }
-            self.env.step(actions)
+                self.env.step(actions)
 
         # one more turn of factory placement
-        self.env.step({"player_0": {}, "player_1": {}})
+        # self.env.step({"player_0": {}, "player_1": {}})
 
         # turn 0 : creating robots for each team
         obs, rewards, dones, infos = self.env.step(self.factory_actions())
