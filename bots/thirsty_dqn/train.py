@@ -34,6 +34,7 @@ def train(args):
         wandb=args.wandb,
         epoch_per_save=args.epoch_per_save,
         device=device,
+        update_nb=100,
     )
 
     start_dqn(config)
