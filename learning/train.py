@@ -124,7 +124,7 @@ if __name__ == "__main__":
     parser.add_argument(
         "--water_consumption",
         type=int,
-        default=0,
+        default=1,
         help="Water consumption of factories",
     )
 

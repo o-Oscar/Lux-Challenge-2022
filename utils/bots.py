@@ -44,6 +44,8 @@ class Bot:
                 self.obs_generator,
                 self.action,
                 grid_kernel_size=21,
+                grid_layers_nb=2,
+                inside_kernel_size=1,
                 inside_layers_nb=2,
                 final_kernel_size=5,
                 final_layers_nb=1,
