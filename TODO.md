@@ -6,7 +6,7 @@ Expériences à faire :
 
 Next Step
 
-- enlever la perte d'eau des facto pour des parties de même longeur
 - mettre la prochain MaJ du jeu
+- mieux gérer la reward (diviser par le nombre de facto initiales et pas le nombre de robots)
 - mieux disposer les factory au début
 - prendre en compte le power (et donc le rubble)

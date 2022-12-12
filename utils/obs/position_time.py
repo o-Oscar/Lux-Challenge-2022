@@ -25,7 +25,7 @@ class PositionTimeObsGenerator(BaseObsGenerator):
         # robot specific features
         for i, team in enumerate(teams):
             for unit_name, unit in obs[team]["units"][team].items():
-                full_grid[i, unit["pos"][1], unit["pos"][0]] = 1
+                full_grid[i, unit["pos"][0], unit["pos"][1]] = 1
 
         # time in the day
         full_grid[2] = np.sin(np.pi * 2 * obs[team]["real_env_steps"] / 100)

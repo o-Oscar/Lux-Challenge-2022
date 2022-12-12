@@ -17,9 +17,9 @@ class PositionIceFactoryObsGenerator(BaseObsGenerator):
     def __init__(self, heavy_robot: bool = True):
         super().__init__()
 
-        self.channel_nb = 7
-        self.grid_channel_nb = 7
-        self.vector_channel_nb = 0
+        self.channel_nb = 6
+        self.grid_channel_nb = 5
+        self.vector_channel_nb = 1
         if heavy_robot:
             self.cargo_space = 1000
         else:
@@ -32,21 +32,28 @@ class PositionIceFactoryObsGenerator(BaseObsGenerator):
         # robot positions
         for i, team in enumerate(teams):
             for unit_name, unit in obs[team]["units"][team].items():
-                full_grid[i, unit["pos"][1], unit["pos"][0]] = 1
+                full_grid[i, unit["pos"][0], unit["pos"][1]] = 1
 
         # delta to factories
-        all_x = np.arange(obs["player_0"]["board"]["ice"].shape[0])
-        all_y = np.arange(obs["player_0"]["board"]["ice"].shape[1])
-        all_x, all_y = np.meshgrid(all_x, all_y)
+        # all_x = np.arange(obs["player_0"]["board"]["ice"].shape[0])
+        # all_y = np.arange(obs["player_0"]["board"]["ice"].shape[1])
+        # all_x, all_y = np.meshgrid(all_x, all_y)
+        # for i, team in enumerate(teams):
+        #     all_deltas = []
+        #     for factory in obs[team]["factories"][team].values():
+        #         cur_delta = np.abs(all_x - factory["pos"][0]) + np.abs(
+        #             all_y - factory["pos"][1]
+        #         )
+        #         all_deltas.append(cur_delta)
+        #     if len(all_deltas) > 0:
+        #         full_grid[2 + i] = np.min(all_deltas, axis=0)
+
         for i, team in enumerate(teams):
-            all_deltas = []
             for factory in obs[team]["factories"][team].values():
-                cur_delta = np.abs(all_x - factory["pos"][0]) + np.abs(
-                    all_y - factory["pos"][1]
-                )
-                all_deltas.append(cur_delta)
-            if len(all_deltas) > 0:
-                full_grid[2 + i] = np.min(all_deltas, axis=0)
+                full_grid[2 + i][
+                    factory["pos"][0] - 1 : factory["pos"][0] + 2,
+                    factory["pos"][1] - 1 : factory["pos"][1] + 2,
+                ] = 1
 
         # ice
         full_grid[4] = obs["player_0"]["board"]["ice"]
@@ -56,12 +63,7 @@ class PositionIceFactoryObsGenerator(BaseObsGenerator):
             for unit_name, unit in obs[team]["units"][team].items():
                 # ice fullyness
                 if unit["cargo"]["ice"] == self.cargo_space:
-                    full_grid[5, unit["pos"][1], unit["pos"][0]] = 1
-
-                # ice
-                full_grid[6, unit["pos"][1], unit["pos"][0]] = (
-                    unit["cargo"]["ice"] / self.cargo_space
-                )
+                    full_grid[5, unit["pos"][0], unit["pos"][1]] = 1
 
         # invert the allied/opponent channels
         second_player_grid = full_grid.copy()

@@ -20,7 +20,7 @@ class SurvivorMoveRewardGenerator(BaseRewardGenerator):
             factory_grid = np.zeros(obs["player_0"]["board"]["ice"].shape)
 
             for factory in obs[team]["factories"][team].values():
-                factory_grid[factory["pos"][1], factory["pos"][0]] = 1
+                factory_grid[factory["pos"][0], factory["pos"][1]] = 1
 
             reward_grid = np.zeros(obs["player_0"]["board"]["ice"].shape)
 
@@ -37,7 +37,7 @@ class SurvivorMoveRewardGenerator(BaseRewardGenerator):
                     if actions[team][unit_id] is not None:
                         cur_reward += MOVE_REWARD
 
-                reward_grid[old_unit["pos"][1], old_unit["pos"][0]] = cur_reward
+                reward_grid[old_unit["pos"][0], old_unit["pos"][1]] = cur_reward
 
             to_return[team] = reward_grid
 

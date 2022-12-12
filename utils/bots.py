@@ -28,11 +28,51 @@ class Bot:
 
     def __init__(self, bot_type: str):
 
-        # FACTORY SURVIVOR
-        if bot_type == "factory_survivor_pretrain":
+        # TEST
+        if bot_type == "test":
             self.action = HarvestTransferActionHandler()
             self.obs_generator = PositionIceFactoryObsGenerator()
-            self.agent = ConvAgent(self.obs_generator, self.action, final_kernel_size=5)
+            self.agent = ConvAgent(self.obs_generator, self.action)
+            self.reward_generators = [ThirstyRewardGenerator()]
+            self.reward_update_nbs = [1]
+
+        # FACTORY SURVIVOR
+        elif bot_type == "thirsty_big":
+            self.action = HarvestTransferActionHandler()
+            self.obs_generator = PositionIceFactoryObsGenerator()
+            self.agent = ConvAgent(
+                self.obs_generator,
+                self.action,
+                grid_kernel_size=21,
+                inside_layers_nb=2,
+                final_kernel_size=5,
+                final_layers_nb=1,
+            )
+            self.reward_generators = [ThirstyRewardGenerator()]
+            self.reward_update_nbs = [1000]
+
+        elif bot_type == "factory_survivor_big":
+            self.action = HarvestTransferActionHandler()
+            self.obs_generator = PositionIceFactoryObsGenerator()
+            self.agent = ConvAgent(
+                self.obs_generator,
+                self.action,
+                grid_kernel_size=21,
+                inside_layers_nb=2,
+                final_kernel_size=5,
+                final_layers_nb=1,
+            )
+            self.reward_generators = [FactorySurvivorRewardGenerator()]
+            self.reward_update_nbs = [1000]
+
+        elif bot_type == "thirsty_big_feature":
+            self.action = HarvestTransferActionHandler()
+            self.obs_generator = PositionIceFactoryObsGenerator()
+            self.agent = ConvAgent(
+                self.obs_generator,
+                self.action,
+                inside_dim=128,
+            )
             self.reward_generators = [ThirstyRewardGenerator()]
             self.reward_update_nbs = [1000]
 
@@ -82,22 +122,6 @@ class Bot:
             self.action = MoveActionHandler()
             self.obs_generator = PositionTimeObsGenerator()
             self.agent = ConvAgent(self.obs_generator, self.action)
-            self.reward_generators = [SurvivorDanceRewardGenerator()]
-            self.reward_update_nbs = [1000]
-
-        elif bot_type == "big_dance":
-            self.action = MoveActionHandler()
-            self.obs_generator = PositionTimeObsGenerator()
-            self.agent = (
-                ConvAgent(
-                    self.obs_generator,
-                    self.action,
-                    inside_dim=128,
-                    grid_kernel_size=22,
-                    grid_layers_nb=2,
-                    post_obs_layers_nb=2,
-                ),
-            )
             self.reward_generators = [SurvivorDanceRewardGenerator()]
             self.reward_update_nbs = [1000]
 

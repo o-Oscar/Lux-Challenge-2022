@@ -24,7 +24,7 @@ class PositionObsGenerator(BaseObsGenerator):
         # robot specific features
         for i, team in enumerate(teams):
             for unit_name, unit in obs[team]["units"][team].items():
-                full_grid[i, unit["pos"][1], unit["pos"][0]] = 1
+                full_grid[i, unit["pos"][0], unit["pos"][1]] = 1
 
         # invert the allied/opponent channels
         second_player_grid = full_grid.copy()

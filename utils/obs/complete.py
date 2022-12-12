@@ -49,8 +49,8 @@ class CompleteObsGenerator(BaseObsGenerator):
         # time in the day
         full_grid[4] = np.sin(np.pi * 2 * obs[team]["real_env_steps"] / 50)
         full_grid[5] = np.cos(np.pi * 2 * obs[team]["real_env_steps"] / 50)
-        #full_grid[4] = 1 if obs[team]["real_env_steps"] % 50 > 25 else 0
-        #full_grid[5] = 0 if obs[team]["real_env_steps"] % 50 > 25 else 1
+        # full_grid[4] = 1 if obs[team]["real_env_steps"] % 50 > 25 else 0
+        # full_grid[5] = 0 if obs[team]["real_env_steps"] % 50 > 25 else 1
 
         # robot specific features
         for i, team in enumerate(teams):
@@ -60,10 +60,10 @@ class CompleteObsGenerator(BaseObsGenerator):
                 ice_feat = unit["cargo"]["ice"] / 100
                 ore_feat = unit["cargo"]["ore"] / 100
                 power_feat = unit["power"] / 150
-                full_grid[6 + i, unit["pos"][1], unit["pos"][0]] = 1
-                full_grid[8, unit["pos"][1], unit["pos"][0]] = ice_feat
-                full_grid[9, unit["pos"][1], unit["pos"][0]] = ore_feat
-                full_grid[10, unit["pos"][1], unit["pos"][0]] = power_feat
+                full_grid[6 + i, unit["pos"][0], unit["pos"][1]] = 1
+                full_grid[8, unit["pos"][0], unit["pos"][1]] = ice_feat
+                full_grid[9, unit["pos"][0], unit["pos"][1]] = ore_feat
+                full_grid[10, unit["pos"][0], unit["pos"][1]] = power_feat
 
         # invert the allied/opponent channels
         second_player_grid = full_grid.copy()

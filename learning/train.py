@@ -25,7 +25,13 @@ def train(args):
                 bot.reward_update_nbs[args.skip_rewards :],
             )
         ):
-            env = Env(bot.action, bot.obs_generator, reward_generator)
+            env = Env(
+                bot.action,
+                bot.obs_generator,
+                reward_generator,
+                water_consumption=args.water_consumption,
+                max_length=args.max_length,
+            )
 
             config = PPOConfig(
                 env=env,
@@ -42,7 +48,13 @@ def train(args):
             )
             start_ppo(config)
     else:
-        env = Env(bot.action, bot.obs_generator, bot.reward_generators[0])
+        env = Env(
+            bot.action,
+            bot.obs_generator,
+            bot.reward_generators[0],
+            water_consumption=args.water_consumption,
+            max_length=args.max_length,
+        )
 
         config = PPOConfig(
             env=env,
@@ -107,6 +119,20 @@ if __name__ == "__main__":
         type=int,
         default=1,
         help="Mini Batch Size",
+    )
+
+    parser.add_argument(
+        "--water_consumption",
+        type=int,
+        default=0,
+        help="Water consumption of factories",
+    )
+
+    parser.add_argument(
+        "--max_length",
+        type=int,
+        default=1000,
+        help="Max length of a game",
     )
 
     args = parser.parse_args()

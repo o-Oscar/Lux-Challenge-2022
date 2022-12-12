@@ -2,7 +2,7 @@ import numpy as np
 from utils import teams
 from utils.reward.base import BaseRewardGenerator
 
-DEATH_REWARD = -1
+DEATH_REWARD = -1000
 DIST_TO_FACTORY_REWARD = -0.02
 GATHER_REWARD = 1
 FULL_REWARD = 5
@@ -27,7 +27,7 @@ class FactorySurvivorRewardGenerator(BaseRewardGenerator):
             factory_grid = np.zeros(obs["player_0"]["board"]["ice"].shape)
 
             for factory in obs[team]["factories"][team].values():
-                factory_grid[factory["pos"][1], factory["pos"][0]] = 1
+                factory_grid[factory["pos"][0], factory["pos"][1]] = 1
 
             all_x = np.arange(obs["player_0"]["board"]["ice"].shape[0])
             all_y = np.arange(obs["player_0"]["board"]["ice"].shape[1])
@@ -56,7 +56,7 @@ class FactorySurvivorRewardGenerator(BaseRewardGenerator):
                     unit = obs[team]["units"][team][unit_id]
                     # is the unit gathering ice and does it have cargo available
                     if (
-                        ice[unit["pos"][1], unit["pos"][0]] != 0
+                        ice[unit["pos"][0], unit["pos"][1]] != 0
                         and unit_id in actions[team]
                         and (
                             actions[team][unit_id] == np.array([[3, 0, 0, 0, 0]])
@@ -80,21 +80,25 @@ class FactorySurvivorRewardGenerator(BaseRewardGenerator):
                         # distance to the closest factory
                         cur_reward += (
                             DIST_TO_FACTORY_REWARD
-                            * distance_to_factories[unit["pos"][1], unit["pos"][0]]
+                            * distance_to_factories[unit["pos"][0], unit["pos"][1]]
                         )
 
                     # did he transfered ice to a factory ?
                     if curr_ice_cargo < old_ice_cargo:
                         cur_reward += TRANSFER_REWARD
-                        print()
-                        print()
-                        print("#" * len("WE DID IT !"))
-                        print("WE DID IT !")
-                        print("#" * len("WE DID IT !"))
-                        print()
-                        print()
+                        # print()
+                        # print()
+                        # print("#" * len("WE DID IT !"))
+                        # print(
+                        #     "WE DID IT ! ("
+                        #     + str(obs[team]["real_env_steps"])
+                        #     + "th step)"
+                        # )
+                        # print("#" * len("WE DID IT !"))
+                        # print()
+                        # print()
 
-                reward_grid[old_unit["pos"][1], old_unit["pos"][0]] = cur_reward
+                reward_grid[old_unit["pos"][0], old_unit["pos"][1]] = cur_reward
 
             to_return[team] = reward_grid
 
