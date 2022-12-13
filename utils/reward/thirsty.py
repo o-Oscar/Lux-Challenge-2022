@@ -2,7 +2,6 @@ import numpy as np
 from utils import teams
 from utils.reward.base import BaseRewardGenerator
 
-DEATH_REWARD = -1
 GATHER_REWARD = 1
 
 
@@ -27,11 +26,8 @@ class ThirstyRewardGenerator(BaseRewardGenerator):
 
                 cur_reward = 0
 
-                # has the unit died
-                if unit_id not in obs[team]["units"][team]:
-                    cur_reward += DEATH_REWARD
-
-                else:
+                # is the unit still alive
+                if unit_id in obs[team]["units"][team]:
                     unit = obs[team]["units"][team][unit_id]
                     # is the unit gathering ice and does it have cargo available
                     if (

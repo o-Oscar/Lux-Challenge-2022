@@ -28,7 +28,7 @@ class Env(gym.Env):
         power_cost: bool = False,
         heavy_robot: bool = True,
         water_consumption: int = 1,
-        max_length: int = 1000,
+        max_length: int = 1100,
     ):
         robots = luxai2022.config.EnvConfig().ROBOTS
 
@@ -54,6 +54,8 @@ class Env(gym.Env):
                 NUM_WEATHER_EVENTS_RANGE=[0, 0],
             )
         )
+
+        self.max_length = max_length
         self.action_handler = action_hanlder
         self.obs_generator = obs_generator
         self.reward_generator = reward_generator
@@ -115,7 +117,7 @@ class Env(gym.Env):
         units_pos = self.calc_unit_pos(obs)
 
         self.old_obs = obs
-        return unit_obs, action_masks, units_pos
+        return unit_obs, action_masks, units_pos, n_factories
 
     def factory_actions(self):
         """

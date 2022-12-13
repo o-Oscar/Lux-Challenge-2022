@@ -74,7 +74,7 @@ def actions_to_env(network_actions, obs):
 def multi_agent_rollout(
     env: Env, agent: BaseAgent, device, max_ep_len=1100, replay_name="replay_custom"
 ):
-    obs, masks, unit_pos = env.reset()
+    obs, masks, unit_pos, n_factories = env.reset()
 
     all_obs = [obs]
     all_rewards = []
@@ -83,6 +83,7 @@ def multi_agent_rollout(
     all_log_prob = []
     all_values = []
     all_unit_pos = [unit_pos]
+    all_nb_factories = [n_factories]
 
     no_unit = False
 
@@ -123,6 +124,7 @@ def multi_agent_rollout(
         all_masks.append(masks)
         all_log_prob.append(log_prob)
         all_unit_pos.append(unit_pos)
+        all_nb_factories.append(n_factories)
 
     env.save(full_save=False, convenient_save=True, replay_name=replay_name)
     # exit()
@@ -138,6 +140,7 @@ def multi_agent_rollout(
         "logprob": all_log_prob,
         "values": all_values,
         "unit_pos": all_unit_pos,
+        "nb_factories": all_nb_factories,
     }
 
 
@@ -177,6 +180,7 @@ class ReplayBuffer:
         self.all_logprob = []
         self.all_values = []
         self.all_unit_pos = []
+        self.all_nb_factories = []
 
         nb_games = 0
         while len(self) < batch_size:
@@ -186,6 +190,7 @@ class ReplayBuffer:
                     self.agent,
                     self.device,
                     replay_name="training_" + self.name,
+                    max_ep_len=self.env.max_length,
                 )
             )
             nb_games += 1
@@ -202,6 +207,7 @@ class ReplayBuffer:
             self.all_logprob.append(get_team_rollout(rollout, "logprob", team))
             self.all_values.append(get_team_rollout(rollout, "values", team))
             self.all_unit_pos.append(get_team_rollout(rollout, "unit_pos", team))
+            self.all_nb_factories.append([x for x in rollout["nb_factories"]])
 
     def compute_advantage(self):
         self.all_advantages = []
@@ -294,6 +300,7 @@ class ReplayBuffer:
         ret_gae = []
         ret_masks = []
         ret_returns = []
+        ret_nb_factories = []
 
         for id in ids:
             ret_obs.append(self.all_obs[id[0]][id[1]])
@@ -304,12 +311,14 @@ class ReplayBuffer:
             ret_returns.append(
                 self.all_gae[id[0]][id[1]] + self.all_values[id[0]][id[1]]
             )
+            ret_nb_factories.append(self.all_nb_factories[id[0]][id[1]])
 
         # print(ret_actions)
         # print(ret_gae[0])
 
         ret_obs = np.stack(ret_obs)
         ret_masks = np.stack(ret_masks)
+        ret_nb_factories = np.stack(ret_nb_factories)
 
         ret_obs = th.tensor(ret_obs, dtype=th.float32)
         ret_actions = th.stack(ret_actions).detach()
@@ -317,6 +326,7 @@ class ReplayBuffer:
         ret_gae = th.stack(ret_gae).detach()
         ret_masks = th.tensor(ret_masks, dtype=th.float32)
         ret_returns = th.stack(ret_returns).detach()
+        ret_nb_factories = th.tensor(ret_nb_factories)
 
         # print("shapes")
         # print(ret_obs.shape)
@@ -334,6 +344,7 @@ class ReplayBuffer:
             ret_gae,
             ret_masks,
             ret_returns,
+            ret_nb_factories,
         )
 
 
@@ -354,8 +365,10 @@ class MeanLogger:
         return self.sum / self.n
 
 
-def m_mean(array, mask):
-    return (array * mask).sum() / (mask.sum() + 1e-5)
+def m_mean(array, mask, normalizer=None):
+    if normalizer is None:
+        normalizer = mask
+    return (array * mask).sum() / (normalizer.sum() + 1e-5)
 
 
 def m_var(array, mask):
@@ -421,7 +434,7 @@ def start_ppo(config: PPOConfig):
         nb_epoch = len(buffer) // LEARNING_BATCH_SIZE
 
         for epoch in range(nb_epoch):
-            for obs, act, logprob, gae, masks, rets in buffer.sample(
+            for obs, act, logprob, gae, masks, rets, nb_factories in buffer.sample(
                 batch_size=LEARNING_BATCH_SIZE
             ):
                 obs = obs.to(device)
@@ -430,6 +443,7 @@ def start_ppo(config: PPOConfig):
                 gae = gae.to(device)
                 masks = masks.to(device)
                 rets = rets.to(device)
+                nb_factories = nb_factories.to(device)
 
                 _, newlogprob, entropy, newvalue = agent.get_action(obs, masks, act)
                 logratio = newlogprob - logprob
@@ -454,12 +468,14 @@ def start_ppo(config: PPOConfig):
                 # Policy loss
                 pg_loss1 = -gae * ratio
                 pg_loss2 = -gae * th.clamp(ratio, 1 - clip_coef, 1 + clip_coef)
-                pg_loss = m_mean(th.max(pg_loss1, pg_loss2), robot_mask)
+                pg_loss = m_mean(th.max(pg_loss1, pg_loss2), robot_mask, nb_factories)
 
                 # Value loss
-                v_loss = 0.5 * m_mean((newvalue - rets) ** 2, robot_mask)
+                v_loss = 0.5 * m_mean((newvalue - rets) ** 2, robot_mask, nb_factories)
 
-                entropy_loss = m_mean(entropy, robot_mask)
+                # Entropy loss
+                entropy_loss = m_mean(entropy, robot_mask, nb_factories)
+
                 loss = pg_loss - ent_coef * entropy_loss + v_loss * vf_coef
 
                 optimizer.zero_grad()
@@ -492,12 +508,14 @@ def start_ppo(config: PPOConfig):
 
         # mean reward computation
         mean_rew = 0
-        for rew, mask in zip(buffer.all_rewards, buffer.all_masks):
+        for rew, mask, nb_factories in zip(
+            buffer.all_rewards, buffer.all_masks, buffer.all_nb_factories
+        ):
             m = np.array(mask)
             m = np.max(m, axis=1)[:-1]
             r = np.array(rew)
             # mean_rew += np.sum(m * r) / np.sum(m) / len(teams)
-            mean_rew += np.sum(m * r) / np.sum(m) / len(teams) / nb_games
+            mean_rew += np.sum(m * r) / np.sum(nb_factories) / len(teams) / nb_games
 
         # logging
         to_log["main/mean_reward"] = mean_rew
