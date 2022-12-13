@@ -515,7 +515,7 @@ def start_ppo(config: PPOConfig):
             m = np.max(m, axis=1)[:-1]
             r = np.array(rew)
             # mean_rew += np.sum(m * r) / np.sum(m) / len(teams)
-            mean_rew += np.sum(m * r) / np.sum(nb_factories) / len(teams) / nb_games
+            mean_rew += np.sum(m * r) / nb_factories[0] / len(teams) / nb_games
 
         # logging
         to_log["main/mean_reward"] = mean_rew
