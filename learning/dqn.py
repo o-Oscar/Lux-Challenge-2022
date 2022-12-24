@@ -2,9 +2,9 @@ import argparse
 import dataclasses
 import itertools
 import os
+import pickle
 import random
 import time
-from distutils.util import strtobool
 from pathlib import Path
 
 import gym
@@ -72,7 +72,9 @@ def actions_to_env(network_actions):
     return to_return
 
 
-def multi_agent_rollout(env: Env, agent: BaseAgent, device, max_ep_len=1100):
+def multi_agent_rollout(
+    env: Env, agent: BaseAgent, device, tau, epsilon, max_ep_len=1100
+):
     obs, masks, unit_pos = env.reset(seed=42)
 
     all_obs = []
@@ -85,7 +87,7 @@ def multi_agent_rollout(env: Env, agent: BaseAgent, device, max_ep_len=1100):
         network_obs = obs_to_network(obs, device)
 
         network_masks = mask_to_network(masks, device)
-        actions = agent.sample_actions(network_obs, network_masks, 0.03)
+        actions = agent.sample_actions(network_obs, network_masks, tau, epsilon)
         # actions = th.tensor(
         #     np.random.randint(0, 5, size=actions.shape), dtype=th.long, device=device
         # )
@@ -122,7 +124,7 @@ def map_robots_grid(robot_pos, next_robot_pos, new_value):
     for robot_id, next_pos in next_robot_pos.items():
         if robot_id in robot_pos:
             cur_pos = robot_pos[robot_id]
-            to_return[cur_pos[1], cur_pos[0]] = new_value[next_pos[1], next_pos[0]]
+            to_return[cur_pos[0], cur_pos[1]] = new_value[next_pos[0], next_pos[1]]
     return to_return
 
 
@@ -134,8 +136,8 @@ def map_robots_grids(all_robot_pos, all_next_robot_pos, new_value):
         for robot_id, next_pos in next_robot_pos.items():
             if robot_id in robot_pos:
                 cur_pos = robot_pos[robot_id]
-                to_return[i, cur_pos[1], cur_pos[0]] = new_value[
-                    i, next_pos[1], next_pos[0]
+                to_return[i, cur_pos[0], cur_pos[1]] = new_value[
+                    i, next_pos[0], next_pos[1]
                 ]
     return to_return
 
@@ -168,6 +170,7 @@ class ReplayBuffer:
 
         while len(self) < batch_size + cur_size:
             self.expand(multi_agent_rollout(self.env, self.agent, self.device))
+            print("current_len : {}".format(len(self)))
 
     def expand(self, rollout):
         for team in teams:
@@ -191,22 +194,28 @@ class ReplayBuffer:
                 cur_q_targets = []
                 for t in range(len(self.all_actions[i])):
                     q_target = self.all_rewards[i][t]
-                    if len(self.all_unit_pos[i]) < t - 1:
+                    if len(self.all_unit_pos[i]) < t - 1 and True:
                         q_target = q_target + self.gamma * map_robots_grids(
                             self.all_unit_pos[i][t],
                             self.all_unit_pos[i][t + 1],
                             all_mean_q[count + 1],
                         )
+                    # if (
+                    #     self.all_masks[i][t][0, 10, 12]
+                    #     and self.all_actions[i][t][10, 12] == 0
+                    # ):
+                    #     print(q_target[10, 12])
                     cur_q_targets.append(q_target)
                     count += 1
                 self.all_q_target.append(cur_q_targets)
+        # exit()
 
     def sample_targets(self, batch_size):
         ids = []
         for i in range(len(self.all_actions)):
             ids = ids + [(i, t) for t in range(len(self.all_actions[i]))]
 
-        # ids = np.random.permutation(ids)
+        # ids = np.random.permutation(ids) # Do not uncomment
         for batch_start in range(0, len(ids), batch_size):
             batch_end = batch_start + batch_size
             if batch_end <= len(ids):
@@ -247,7 +256,14 @@ class ReplayBuffer:
     def sample(self, batch_size):
         ids = []
         for i in range(len(self.all_actions)):
-            ids = ids + [(i, t - 1) for t in range(len(self.all_actions[i]))]
+            ids = ids + [(i, t) for t in range(len(self.all_actions[i]))]
+
+        # batch_start = 0
+        # batch_end = batch_start + batch_size
+        # # print(ids[batch_start:batch_end])
+        # # exit()
+        # yield self.generate_batch(ids[batch_start:batch_end])
+        # return
 
         ids = np.random.permutation(ids)
         for batch_start in range(0, len(ids), batch_size):
@@ -318,7 +334,7 @@ class MeanLogger:
 
 
 def m_mean(array, mask):
-    return (array * mask).sum() / (mask.sum() + 1e-5)
+    return (array * mask).sum()  # / (mask.sum() + 1e-5)
 
 
 def m_var(array, mask):
@@ -334,7 +350,7 @@ def start_dqn(config: DqnConfig):
         config.save_path.mkdir(exist_ok=True, parents=True)
 
     if config.wandb:
-        wandb.init(project="lux_ai_ppo", name=config.save_path.name)
+        wandb.init(project="lux_ai_dqn", name=config.save_path.name)
 
     env = config.env
 
@@ -349,25 +365,33 @@ def start_dqn(config: DqnConfig):
     print(config.save_path / q_network_name)
     # exit()
 
-    optimizer = optim.Adam(agent.parameters(), lr=2.5e-4, eps=1e-5)
+    optimizer = optim.Adam(agent.parameters(), lr=3e-4)
 
-    buffer = ReplayBuffer(env, agent, device, config.gamma)
+    if True:
+        with open("coucou.pkl", "rb") as f:
+            buffer = pickle.load(f)
+        buffer.env = env
+        buffer.agent = agent
+        buffer.device = device
+        buffer.gamma = config.gamma
+    else:
+        buffer = ReplayBuffer(env, agent, device, config.gamma)
+        print("filling buffer")
+
+        buffer.fill(10000)
+        with open("coucou.pkl", "wb") as f:
+            pickle.dump(buffer, f)
+        # exit()
 
     start_time = time.time()
 
     q_loss_log = MeanLogger()
     v_loss_log = MeanLogger()
-    mean_ratio = MeanLogger()
-    mean_reward_log = MeanLogger()
-
-    # print("Computing a targets")
 
     for update in range(config.update_nb):
 
         # target_agent.load_state_dict(agent.state_dict())
 
-        print("filling buffer")
-        buffer.fill(20)
         print(len(buffer))
         # buffer.fill(1024)
 
@@ -384,34 +408,38 @@ def start_dqn(config: DqnConfig):
 
         # tau = np.exp(np.log(1e-2) * update / 30)
 
-        print("Computing q targets")
-        buffer.calc_q_target(target_agent)
-
         for epoch in range(1000):
-            start_time = time.time()
-            print(
-                "Update {} Epoch {} | Trajs computation ".format(update, epoch),
-                end="",
-                flush=True,
-            )
 
+            # saving the networks
             if config.epoch_per_save > 0 and (update + 1) % config.epoch_per_save == 0:
                 q_network_name = "q_network_{:04d}".format(update * 0)
                 th.save(agent.q_network.state_dict(), config.save_path / q_network_name)
                 v_network_name = "v_network_{:04d}".format(update * 0)
                 th.save(agent.v_network.state_dict(), config.save_path / v_network_name)
 
+            start_time = time.time()
+            print(
+                "Update {} Epoch {} | Q-targets computation ".format(update, epoch),
+                end="",
+                flush=True,
+            )
+
+            # if epoch == 50:
+            #     for g in optimizer.param_groups:
+            #         g["lr"] = 1e-4
+            # if epoch == 200:
+            #     for g in optimizer.param_groups:
+            #         g["lr"] = 3e-5
+
+            buffer.calc_q_target(target_agent)
+            tau = np.exp(np.log(1e-2) * epoch / 300)
+
             q_loss_log.reset()
             v_loss_log.reset()
 
-            # exit()
-
             print("| Learning ", end="", flush=True)
 
-            with th.no_grad():
-                for ap, tp in zip(agent.parameters(), target_agent.parameters()):
-                    tp = tp * config.polyak + ap * (1 - config.polyak)
-
+            batch_size = 256
             for (
                 obs,
                 robot_pos,
@@ -420,22 +448,26 @@ def start_dqn(config: DqnConfig):
                 rewards,
                 done,
                 q_target,
-            ) in buffer.sample(batch_size=32):
+            ) in buffer.sample(batch_size=batch_size):
+
+                q_pred = agent.q_eval(obs, actions, masks)
+                q_loss = (
+                    m_mean(th.square(q_pred - q_target), th.max(masks, dim=1).values)
+                    / batch_size
+                )
+
+                # for i in range(32):
+                #     print(q_pred[i, 10, 12], q_target[i, 10, 12])
 
                 with th.no_grad():
                     new_actions = th.randint(
-                        0, 5, size=(32, 48, 48), dtype=th.long, device=device
+                        0, 5, size=(batch_size, 48, 48), dtype=th.long, device=device
                     )
                     new_q = target_agent.q_eval(obs, new_actions, masks)
 
-                q_pred = agent.q_eval(obs, actions, masks)
-                q_loss = m_mean(
-                    th.square(q_pred - q_target), th.max(masks, dim=1).values
-                )
-
                 v_diff = new_q - agent.v_eval(obs)
                 v_loss = m_mean(
-                    th.square(v_diff) * th.exp(v_diff / 0.03).detach(),
+                    th.square(v_diff) * th.exp(v_diff / tau).detach(),
                     th.max(masks, dim=1).values,
                 )
 
@@ -445,36 +477,18 @@ def start_dqn(config: DqnConfig):
                 optimizer.zero_grad()
 
                 q_loss_log.update(q_loss.item())
-                v_loss_log.update(v_loss.item())
+                # v_loss_log.update(v_loss.item())
 
-            to_log = {}
-
-            # mean reward computation
-            mean_rew = 0
-            for rew, mask in zip(buffer.all_rewards, buffer.all_masks):
-                m = np.array(mask)
-                m = np.max(m, axis=1)
-                r = np.array(rew)
-                mean_rew += np.sum(m * r) / np.sum(m) / len(teams)
+            # target parameters update
+            with th.no_grad():
+                for ap, tp in zip(agent.parameters(), target_agent.parameters()):
+                    tp = tp * config.polyak + ap * (1 - config.polyak)
 
             # logging
+            to_log = {}
             to_log["main/q_loss"] = q_loss_log.value
-            to_log["main/v_loss"] = v_loss_log.value
+            # to_log["main/v_loss"] = v_loss_log.value
             to_log["main/rollout_reward"] = mean_reward
-
-            # if q_loss.value < 1e-5:
-            #     buffer.fill(70)
-            #     buffer.calc_q_target(target_agent)
-
-            # to_log["main/value_loss"] = value_loss.value
-
-            # to_log["infos/policy_loss"] = policy_loss.value
-            # to_log["infos/policy_loss"] = policy_loss.value
-            # to_log["infos/entropy"] = entropy_logger.value
-            # to_log["infos/approx_kl"] = approx_kl_logger.value
-            # to_log["infos/clipfrac"] = clipfrac_logger.value
-            # to_log["infos/explained_variance"] = explained_variance.value
-            # to_log["infos/mean_ratio"] = mean_ratio.value
 
             if config.wandb:
                 wandb.log(to_log)

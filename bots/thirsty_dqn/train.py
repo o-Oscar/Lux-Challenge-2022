@@ -9,7 +9,7 @@ from learning.dqn import DqnConfig, start_dqn
 from utils.action.move import MoveActionHandler
 from utils.env import Env
 from utils.obs.complete import CompleteObsGenerator
-from utils.reward.survivor import SurvivorRewardGenerator
+from utils.reward.survivor import GlobalSurvivorRewardGenerator, SurvivorRewardGenerator
 from utils.reward.thirsty import ThirstyReward
 
 
@@ -18,8 +18,9 @@ def train(args):
 
     action_handler = MoveActionHandler()
     obs_generator = CompleteObsGenerator()
-    reward_generator = ThirstyReward()
+    # reward_generator = ThirstyReward()
     # reward_generator = SurvivorRewardGenerator()
+    reward_generator = GlobalSurvivorRewardGenerator()
 
     env = Env(action_handler, obs_generator, reward_generator)
 
@@ -34,7 +35,7 @@ def train(args):
         wandb=args.wandb,
         epoch_per_save=args.epoch_per_save,
         device=device,
-        update_nb=100,
+        update_nb=1,
     )
 
     start_dqn(config)

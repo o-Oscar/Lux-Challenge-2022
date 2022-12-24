@@ -42,3 +42,25 @@ class SurvivorRewardGenerator(BaseRewardGenerator):
             to_return[team] = reward_grid
 
         return to_return
+
+
+class GlobalSurvivorRewardGenerator(BaseRewardGenerator):
+    def __init__(self):
+        pass
+
+    def calc_rewards(self, old_obs, actions, obs):
+
+        to_return = {}
+
+        for team in teams:
+            reward_grid = np.zeros(obs["player_0"]["board"]["ice"].shape)
+
+            prev_nb_units = len(old_obs[team]["units"][team])
+            next_nb_units = len(obs[team]["units"][team])
+            for unit_id, old_unit in old_obs[team]["units"][team].items():
+                cur_reward = next_nb_units - prev_nb_units
+                reward_grid[old_unit["pos"][0], old_unit["pos"][1]] = cur_reward
+
+            to_return[team] = reward_grid
+
+        return to_return
