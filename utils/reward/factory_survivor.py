@@ -2,9 +2,9 @@ import numpy as np
 from utils import teams
 from utils.reward.base import BaseRewardGenerator
 
-DIST_TO_FACTORY_REWARD = -0.01
+DIST_TO_FACTORY_REWARD = -0.1
 GATHER_REWARD = 1
-FULL_REWARD = 5
+FULL_REWARD = 50
 TRANSFER_REWARD = 1000
 
 
@@ -80,7 +80,14 @@ class FactorySurvivorRewardGenerator(BaseRewardGenerator):
                         )
 
                     # did he transfered ice to a factory ?
-                    if curr_ice_cargo < old_ice_cargo:
+                    if (
+                        curr_ice_cargo < old_ice_cargo
+                        and unit_id in actions[team]
+                        and (
+                            actions[team][unit_id]
+                            == np.array([[1, 0, 0, self.cargo_space, 0]])
+                        ).all()
+                    ):
                         cur_reward += TRANSFER_REWARD
                         # print()
                         # print()

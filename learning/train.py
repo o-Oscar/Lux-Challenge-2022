@@ -44,7 +44,9 @@ def train(args):
                 epoch_per_save=args.epoch_per_save,
                 device=device,
                 min_batch_size=args.min_batch_size,
+                learning_batch_size=args.learning_batch_size,
                 update_nb=reward_update_nb,
+                gamma=args.gamma,
             )
             start_ppo(config)
     else:
@@ -65,7 +67,9 @@ def train(args):
             epoch_per_save=args.epoch_per_save,
             device=device,
             min_batch_size=args.min_batch_size,
+            learning_batch_size=args.learning_batch_size,
             update_nb=bot.reward_update_nbs[0],
+            gamma=args.gamma,
         )
         start_ppo(config)
 
@@ -122,6 +126,13 @@ if __name__ == "__main__":
     )
 
     parser.add_argument(
+        "--learning_batch_size",
+        type=int,
+        default=300,
+        help="Learning Batch Size",
+    )
+
+    parser.add_argument(
         "--water_consumption",
         type=int,
         default=1,
@@ -133,6 +144,13 @@ if __name__ == "__main__":
         type=int,
         default=1000,
         help="Max length of a game",
+    )
+
+    parser.add_argument(
+        "--gamma",
+        type=float,
+        default=0.99,
+        help="Discount factor",
     )
 
     args = parser.parse_args()

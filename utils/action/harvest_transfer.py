@@ -61,7 +61,7 @@ class HarvestTransferActionHandler(BaseActionHandler):
                 # left action not possible when on the left of the board
                 if unit["pos"][1] == 0:
                     mask[4] = 0
-                # ice transfer not possible when we have no ice or we are not on top of a factory
+                # ice transfer not possible when we are not full in ice or we are not on top of a factory
                 if (
                     unit["cargo"]["ice"] < self.cargo_space
                     or factory_mask[unit["pos"][0], unit["pos"][1]] == 0

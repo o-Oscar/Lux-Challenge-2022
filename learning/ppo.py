@@ -20,9 +20,6 @@ from utils.env import Env, get_env
 from utils.agent.base import BaseAgent
 
 
-LEARNING_BATCH_SIZE = 300
-
-
 @dataclasses.dataclass
 class PPOConfig:
     agent: BaseAgent
@@ -33,7 +30,9 @@ class PPOConfig:
     name: str = "default"
     epoch_per_save: int = 0
     min_batch_size: int = 32
+    learning_batch_size: int = 300
     update_nb: int = 1000
+    gamma: float = 0.99
 
 
 # TODO : add that to the ppo config
@@ -163,13 +162,13 @@ def get_team_rollout(
 
 
 class ReplayBuffer:
-    def __init__(self, env: Env, agent: BaseAgent, device, name: str):
+    def __init__(self, env: Env, agent: BaseAgent, device, name: str, gamma: float):
         self.env = env
         self.agent = agent
         self.device = device
         self.name = name
 
-        self.gamma = 0.99
+        self.gamma = gamma
         self.lamb = 0.95
 
     def fill(self, batch_size: int):
@@ -393,7 +392,7 @@ def start_ppo(config: PPOConfig):
     agent = config.agent.to(device)
     optimizer = optim.Adam(agent.parameters(), lr=2.5e-4, eps=1e-5)
 
-    buffer = ReplayBuffer(env, agent, device, config.name)
+    buffer = ReplayBuffer(env, agent, device, config.name, config.gamma)
 
     start_time = time.time()
 
@@ -431,11 +430,11 @@ def start_ppo(config: PPOConfig):
 
         print("| Learning ", end="", flush=True)
 
-        nb_epoch = len(buffer) // LEARNING_BATCH_SIZE
+        nb_epoch = len(buffer) // config.learning_batch_size
 
         for epoch in range(nb_epoch):
             for obs, act, logprob, gae, masks, rets, nb_factories in buffer.sample(
-                batch_size=LEARNING_BATCH_SIZE
+                batch_size=config.learning_batch_size
             ):
                 obs = obs.to(device)
                 act = act.to(device)

@@ -10,7 +10,6 @@ class PositionIceFactoryObsGenerator(BaseObsGenerator):
         - position of each robot
         - distance to each factory
         - position of ice
-        - ice of each robot
         - ice fullyness of each robot
     """
 
