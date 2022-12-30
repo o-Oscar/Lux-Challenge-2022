@@ -20,49 +20,49 @@ class ObsHead(nn.Module):
     def __init__(
         self,
         obs_generator: BaseObsGenerator,
-        inside_dim=32,
+        inside_dim=64,
         grid_kernel_size=11,
         grid_layers_nb=1,
+        vector_post_channel_nb=None,
     ):
         super().__init__()
         self.grid_channel_nb = obs_generator.grid_channel_nb
         self.vector_channel_nb = obs_generator.vector_channel_nb
 
-        if self.vector_channel_nb == 0 or self.grid_channel_nb == 0:
-            inside_dim *= 2
+        if vector_post_channel_nb == None:
+            vector_post_channel_nb = self.vector_channel_nb
 
-        if self.grid_channel_nb == self.vector_channel_nb == 0:
-            print("No obs channel given")
+        self.grid_inside_dim = inside_dim - vector_post_channel_nb
+
+        if self.grid_channel_nb == 0:
+            print("No grid channel given")
             raise ValueError
 
-        if self.grid_channel_nb > 0:
-            grid_layers = [
+        grid_layers = [
+            nn.Conv2d(
+                self.grid_channel_nb,
+                self.grid_inside_dim,
+                grid_kernel_size,
+                padding="same",
+            ),
+            nn.Tanh(),
+        ]
+        for _ in range(grid_layers_nb - 1):
+            grid_layers.append(
                 nn.Conv2d(
-                    self.grid_channel_nb,
-                    inside_dim // 2,
+                    self.grid_inside_dim,
+                    self.grid_inside_dim,
                     grid_kernel_size,
                     padding="same",
-                ),
-                nn.Tanh(),
-            ]
-            for _ in range(grid_layers_nb - 1):
-                grid_layers.append(
-                    nn.Conv2d(
-                        inside_dim // 2,
-                        inside_dim // 2,
-                        grid_kernel_size,
-                        padding="same",
-                    )
                 )
-                grid_layers.append(nn.Tanh())
-            grid_layers.pop()
-            self.grid_head = nn.Sequential(*grid_layers)
-        else:
-            self.grid_head = None
+            )
+            grid_layers.append(nn.Tanh())
+        grid_layers.pop()
+        self.grid_head = nn.Sequential(*grid_layers)
 
         if self.vector_channel_nb > 0:
             self.vector_head = nn.Conv2d(
-                self.vector_channel_nb, inside_dim // 2, 1, padding="same"
+                self.vector_channel_nb, vector_post_channel_nb, 1, padding="same"
             )
         else:
             self.vector_head = None
@@ -71,17 +71,14 @@ class ObsHead(nn.Module):
         grid_obs = obs[:, : self.grid_channel_nb]
         vector_obs = obs[:, self.grid_channel_nb :]
 
-        if self.grid_head is not None:
-            grid_feat = self.grid_head(grid_obs)
-        else:
-            return th.relu(self.vector_head(vector_obs))
+        grid_feat = self.grid_head(grid_obs)
 
         if self.vector_head is not None:
             vector_feat = self.vector_head(vector_obs)
+            return th.relu(th.concat([grid_feat, vector_feat], dim=1))
+
         else:
             return th.relu(grid_feat)
-
-        return th.relu(th.concat([grid_feat, vector_feat], dim=1))
 
 
 class ConvAgent(BaseAgent):
@@ -92,6 +89,7 @@ class ConvAgent(BaseAgent):
         inside_dim=64,
         grid_kernel_size=11,
         grid_layers_nb=1,
+        vector_post_channel_nb=None,
         inside_kernel_size=1,
         inside_layers_nb=1,
         final_kernel_size=1,
@@ -99,12 +97,33 @@ class ConvAgent(BaseAgent):
     ):
         super().__init__()
 
+        self.inside_dim = inside_dim
+        self.grid_kernel_size = grid_kernel_size
+        self.grid_layers_nb = grid_layers_nb
+        self.vector_post_channel_nb = vector_post_channel_nb
+        self.inside_kernel_size = inside_kernel_size
+        self.inside_layers_nb = inside_layers_nb
+        self.final_kernel_size = final_kernel_size
+        self.final_layers_nb = final_layers_nb
+
         # Obs Layers
         critic_layers = [
-            ObsHead(obs_generator, inside_dim, grid_kernel_size, grid_layers_nb)
+            ObsHead(
+                obs_generator,
+                inside_dim,
+                grid_kernel_size,
+                grid_layers_nb,
+                vector_post_channel_nb,
+            )
         ]
         actor_layers = [
-            ObsHead(obs_generator, inside_dim, grid_kernel_size, grid_layers_nb)
+            ObsHead(
+                obs_generator,
+                inside_dim,
+                grid_kernel_size,
+                grid_layers_nb,
+                vector_post_channel_nb,
+            )
         ]
 
         # Inside Layers

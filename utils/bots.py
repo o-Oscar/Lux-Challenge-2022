@@ -32,11 +32,33 @@ class Bot:
         if bot_type == "test":
             self.action = HarvestTransferActionHandler()
             self.obs_generator = PositionIceFactoryObsGenerator()
-            self.agent = ConvAgent(self.obs_generator, self.action)
+            self.agent = ConvAgent(
+                self.obs_generator,
+                self.action,
+                grid_kernel_size=1,
+                inside_layers_nb=0,
+                final_kernel_size=1,
+                final_layers_nb=1,
+            )
             self.reward_generators = [ThirstyRewardGenerator()]
             self.reward_update_nbs = [1]
 
         # FACTORY SURVIVOR
+
+        elif bot_type == "old_factory_survivor_light":
+            self.action = HarvestTransferActionHandler()
+            self.obs_generator = PositionIceFactoryObsGenerator()
+            self.agent = ConvAgent(
+                self.obs_generator,
+                self.action,
+                grid_kernel_size=21,
+                vector_post_channel_nb=32,
+                inside_layers_nb=0,
+                final_kernel_size=5,
+                final_layers_nb=1,
+            )
+            self.reward_generators = [FactorySurvivorRewardGenerator()]
+            self.reward_update_nbs = [10000]
 
         elif bot_type == "factory_survivor_light":
             self.action = HarvestTransferActionHandler()
@@ -45,12 +67,12 @@ class Bot:
                 self.obs_generator,
                 self.action,
                 grid_kernel_size=21,
-                inside_layers_nb=0,
+                inside_layers_nb=1,
                 final_kernel_size=5,
                 final_layers_nb=1,
             )
             self.reward_generators = [FactorySurvivorRewardGenerator()]
-            self.reward_update_nbs = [1000]
+            self.reward_update_nbs = [10000]
 
         elif bot_type == "factory_survivor_big":
             self.action = HarvestTransferActionHandler()
@@ -66,7 +88,7 @@ class Bot:
                 final_layers_nb=1,
             )
             self.reward_generators = [FactorySurvivorRewardGenerator()]
-            self.reward_update_nbs = [1000]
+            self.reward_update_nbs = [10000]
 
         # THIRSTY
         elif bot_type == "thirsty_FK1_FL1":

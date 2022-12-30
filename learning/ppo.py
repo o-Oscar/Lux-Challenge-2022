@@ -77,6 +77,7 @@ def multi_agent_rollout(
 
     all_obs = [obs]
     all_rewards = []
+    all_rewards_monitoring = []
     all_masks = [masks]
     all_actions = []
     all_log_prob = []
@@ -110,7 +111,7 @@ def multi_agent_rollout(
             actions[team] = actions[team].detach().cpu()
             log_prob[team] = log_prob[team].detach().cpu()
 
-        obs, rewards, masks, done, unit_pos = env.step(actions)
+        obs, rewards, rewards_monotoring, masks, done, unit_pos = env.step(actions)
         # print(np.min(rewards[teams[0]]), np.max(rewards[teams[0]]))
 
         all_values.append(value)
@@ -120,6 +121,7 @@ def multi_agent_rollout(
         all_obs.append(obs)
         all_actions.append(actions)
         all_rewards.append(rewards)
+        all_rewards_monitoring.append(rewards_monotoring)
         all_masks.append(masks)
         all_log_prob.append(log_prob)
         all_unit_pos.append(unit_pos)
@@ -135,6 +137,7 @@ def multi_agent_rollout(
         "obs": all_obs,
         "actions": all_actions,
         "rewards": all_rewards,
+        "rewards_monitoring": all_rewards_monitoring,
         "masks": all_masks,
         "logprob": all_log_prob,
         "values": all_values,
@@ -175,6 +178,7 @@ class ReplayBuffer:
         self.all_obs = []
         self.all_actions = []
         self.all_rewards = []
+        self.all_rewards_monitoring = []
         self.all_masks = []
         self.all_logprob = []
         self.all_values = []
@@ -202,6 +206,9 @@ class ReplayBuffer:
             self.all_obs.append(get_team_rollout(rollout, "obs", team))
             self.all_actions.append(get_team_rollout(rollout, "actions", team))
             self.all_rewards.append(get_team_rollout(rollout, "rewards", team))
+            self.all_rewards_monitoring.append(
+                get_team_rollout(rollout, "rewards_monitoring", team)
+            )
             self.all_masks.append(get_team_rollout(rollout, "masks", team))
             self.all_logprob.append(get_team_rollout(rollout, "logprob", team))
             self.all_values.append(get_team_rollout(rollout, "values", team))
@@ -377,13 +384,29 @@ def m_var(array, mask):
 
 def start_ppo(config: PPOConfig):
 
-    if config.epoch_per_save > 0 and config.save_path.is_dir():
-        raise NameError("Save folder already exists. Default is to not override")
     if config.epoch_per_save > 0:
-        config.save_path.mkdir(exist_ok=False, parents=True)
+        if not (config.save_path.is_dir()):
+            config.save_path.mkdir(exist_ok=False, parents=True)
+
+        if any(config.save_path.iterdir()):
+            raise NameError(
+                "Save folder already exists and is not empty. Default is to not override"
+            )
 
     if config.wandb:
-        wandb.init(project="lux_ai_ppo", name=config.name)
+        wandb_config = {
+            "inside_dim": config.agent.inside_dim,
+            "grid_kernel_size": config.agent.grid_kernel_size,
+            "grid_layers_nb": config.agent.grid_layers_nb,
+            "vector_post_channel_nb": config.agent.vector_post_channel_nb,
+            "inside_kernel_size": config.agent.inside_kernel_size,
+            "inside_layers_nb": config.agent.inside_layers_nb,
+            "final_kernel_size": config.agent.final_kernel_size,
+            "final_layers_nb": config.agent.final_layers_nb,
+            "batch_size": config.min_batch_size,
+            "learning_batch_size": config.learning_batch_size,
+        }
+        wandb.init(project="lux_ai_ppo", name=config.name, config=wandb_config)
 
     env = config.env
 
@@ -426,7 +449,6 @@ def start_ppo(config: PPOConfig):
         mean_reward.reset()
 
         nb_games = buffer.fill(config.min_batch_size)
-        # exit()
 
         print("| Learning ", end="", flush=True)
 
@@ -503,24 +525,31 @@ def start_ppo(config: PPOConfig):
                 )
                 explained_variance.update(explained_var, n)
                 mean_ratio.update(m_mean(ratio, robot_mask), n)
-        to_log = {}
 
+        to_log = {}
         # mean reward computation
         mean_rew = 0
-        for rew, mask, nb_factories in zip(
-            buffer.all_rewards, buffer.all_masks, buffer.all_nb_factories
+        mean_rew_monitoring = 0
+        for rew, rew_monitoring, mask, nb_factories in zip(
+            buffer.all_rewards,
+            buffer.all_rewards_monitoring,
+            buffer.all_masks,
+            buffer.all_nb_factories,
         ):
             m = np.array(mask)
             m = np.max(m, axis=1)[:-1]
             r = np.array(rew)
-            # mean_rew += np.sum(m * r) / np.sum(m) / len(teams)
+            r_monitoring = np.array(rew_monitoring)
             mean_rew += np.sum(m * r) / nb_factories[0] / len(teams) / nb_games
+            mean_rew_monitoring += (
+                np.sum(m * r_monitoring) / nb_factories[0] / len(teams) / nb_games
+            )
 
         # logging
         to_log["main/mean_reward"] = mean_rew
+        to_log["main/mean_reward_monitoring"] = mean_rew_monitoring
         to_log["main/value_loss"] = value_loss.value
 
-        to_log["infos/policy_loss"] = policy_loss.value
         to_log["infos/policy_loss"] = policy_loss.value
         to_log["infos/entropy"] = entropy_logger.value
         to_log["infos/approx_kl"] = approx_kl_logger.value

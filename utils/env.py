@@ -1,7 +1,7 @@
 import gym
 from gym import spaces
 import numpy as np
-
+from scipy import ndimage
 import luxai2022
 from luxai_runner.utils import to_json
 from pathlib import Path
@@ -82,13 +82,90 @@ class Env(gym.Env):
         # factory positionning phase
 
         n_factories = obs["player_0"]["board"]["factories_per_team"]
-
         valid_pos = np.where(obs["player_0"]["board"]["valid_spawns_mask"])
         n_valid = int(np.sum(obs["player_0"]["board"]["valid_spawns_mask"]))
+        ice_grid = obs["player_0"]["board"]["ice"]
         fac_pos = []
-        for i in range(n_factories * 2):
-            pos_id = int(n_valid * (i + 1) / (n_factories * 2 + 1))
+
+        # 4 kernel to count the number of ice closer than 4 different distances
+        # (there is not always enough place to only use the most little distance)
+        nb_kernels = 4
+        ice_scores = []
+        for k in range(1, nb_kernels + 1):
+            distance = 10 * k + 1
+            kernel = np.zeros((2 * distance, 2 * distance))
+            # put ones where we are closer to the center than distance
+            for i in range(2 * distance):
+                for j in range(2 * distance):
+                    if np.abs(i - distance) + np.abs(j - distance) < distance:
+                        kernel[i, j] = 1
+            convolute_image = ndimage.convolve(
+                ice_grid, kernel, mode="constant", cval=0.0
+            )
+            ice_scores.append(convolute_image)
+
+        # sort the id with the 4 scores
+        sorted_poses_per_distance = []
+        for num_distance, ice_score in enumerate(ice_scores):
+            pos_ids = list(range(n_valid))
+            pos_ids.sort(
+                key=lambda pos_id: ice_score[
+                    valid_pos[0][pos_id], valid_pos[1][pos_id]
+                ],
+                reverse=True,
+            )
+            for i in range(n_valid):
+                if num_distance < nb_kernels - 1 and (
+                    ice_score[
+                        valid_pos[0][pos_ids[i]],
+                        valid_pos[1][pos_ids[i]],
+                    ]
+                    < 4
+                ):
+                    pos_ids = pos_ids[:i]
+                    break
+            sorted_poses_per_distance.append(pos_ids)
+
+        # choose the id for the factories, prioritizing the first distances
+        num_distance = 0
+        while len(fac_pos) < n_factories * 2:
+            pos_id = sorted_poses_per_distance[num_distance][0]
             fac_pos.append((valid_pos[0][pos_id], valid_pos[1][pos_id]))
+            to_delete_pos_ids = []
+            for remaining_pos_id in sorted_poses_per_distance[-1]:
+                if (
+                    remaining_pos_id not in to_delete_pos_ids
+                    and np.linalg.norm(
+                        np.array(
+                            [
+                                valid_pos[0][remaining_pos_id],
+                                valid_pos[1][remaining_pos_id],
+                            ]
+                        )
+                        - np.array([valid_pos[0][pos_id], valid_pos[1][pos_id]]),
+                        ord=np.inf,
+                    )
+                    < 8
+                ):
+                    to_delete_pos_ids.append(remaining_pos_id)
+
+            for to_delete_pos_id in to_delete_pos_ids:
+                for sorted_poses in sorted_poses_per_distance:
+                    if to_delete_pos_id in sorted_poses:
+                        sorted_poses.remove(to_delete_pos_id)
+
+            while len(sorted_poses_per_distance[num_distance]) == 0:
+                num_distance += 1
+
+        # grid_start_pos = np.zeros_like(ice_grid)
+        # for start_pos in fac_pos:
+        #     grid_start_pos[
+        #         start_pos[0] - 1 : start_pos[0] + 2, start_pos[1] - 1 : start_pos[1] + 2
+        #     ] = 1
+        # fig, ax = plt.subplots(1, 2)
+        # ax[0].imshow(ice_grid)
+        # ax[1].imshow(grid_start_pos)
+        # plt.show()
 
         for i in range(n_factories):
             for j, team in enumerate(teams):
@@ -167,12 +244,14 @@ class Env(gym.Env):
 
         unit_obs = self.obs_generator.calc_obs(obs)
         action_masks = self.action_handler.calc_masks(obs)
-        rewards = self.reward_generator.calc_rewards(self.old_obs, actions, obs)
+        rewards, rewards_monotoring = self.reward_generator.calc_rewards(
+            self.old_obs, actions, obs
+        )
 
         units_pos = self.calc_unit_pos(obs)
 
         self.old_obs = obs
-        return unit_obs, rewards, action_masks, done, units_pos
+        return unit_obs, rewards, rewards_monotoring, action_masks, done, units_pos
 
     def save(self, **kwargs):
         return self.env.save(**kwargs)

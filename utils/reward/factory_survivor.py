@@ -19,6 +19,7 @@ class FactorySurvivorRewardGenerator(BaseRewardGenerator):
     def calc_rewards(self, old_obs, actions, obs):
 
         to_return = {}
+        to_return_monitoring = {}
 
         ice = obs["player_0"]["board"]["ice"]
 
@@ -42,10 +43,12 @@ class FactorySurvivorRewardGenerator(BaseRewardGenerator):
                 distance_to_factories = np.min(all_deltas, axis=0)
 
             reward_grid = np.zeros(obs["player_0"]["board"]["ice"].shape)
+            reward_grid_monitoring = np.zeros(obs["player_0"]["board"]["ice"].shape)
 
             for unit_id, old_unit in old_obs[team]["units"][team].items():
 
                 cur_reward = 0
+                cur_reward_monitoring = 0
 
                 # is the unit still alive
                 if unit_id in obs[team]["units"][team]:
@@ -89,6 +92,8 @@ class FactorySurvivorRewardGenerator(BaseRewardGenerator):
                         ).all()
                     ):
                         cur_reward += TRANSFER_REWARD
+                        cur_reward_monitoring += 1
+
                         # print()
                         # print()
                         # print("#" * len("WE DID IT !"))
@@ -102,7 +107,11 @@ class FactorySurvivorRewardGenerator(BaseRewardGenerator):
                         # print()
 
                 reward_grid[old_unit["pos"][0], old_unit["pos"][1]] = cur_reward
+                reward_grid_monitoring[
+                    old_unit["pos"][0], old_unit["pos"][1]
+                ] = cur_reward_monitoring
 
             to_return[team] = reward_grid
+            to_return_monitoring[team] = reward_grid_monitoring
 
-        return to_return
+        return to_return, to_return_monitoring
