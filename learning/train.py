@@ -12,7 +12,7 @@ from learning.ppo import PPOConfig, start_ppo
 def train(args):
     device = th.device("cuda" if th.cuda.is_available() else "cpu")
 
-    bot = Bot(args.bot_type)
+    bot = Bot(args.bot_type, args.vec_chan)
     agent = bot.agent
 
     if args.init_save_path is not None:
@@ -88,6 +88,13 @@ if __name__ == "__main__":
         type=str,
         default="default",
         help="Type of the Bot.",
+    )
+
+    parser.add_argument(
+        "--vec_chan",
+        type=int,
+        default=32,
+        help="Number of output channels for the vector Obs Head",
     )
 
     parser.add_argument(

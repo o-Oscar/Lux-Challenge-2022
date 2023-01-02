@@ -1,5 +1,4 @@
 Next Step
 
-- mieux répartir les channels d'obs
-- mieux disposer les factory au début ?
-- prendre en compte le power (et donc le rubble)
+- entrainement avec moins de vec_channels
+- entrainement du big

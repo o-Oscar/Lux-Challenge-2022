@@ -398,6 +398,7 @@ def start_ppo(config: PPOConfig):
             "inside_dim": config.agent.inside_dim,
             "grid_kernel_size": config.agent.grid_kernel_size,
             "grid_layers_nb": config.agent.grid_layers_nb,
+            "grid_post_channel_nb": config.agent.grid_post_channel_nb,
             "vector_post_channel_nb": config.agent.vector_post_channel_nb,
             "inside_kernel_size": config.agent.inside_kernel_size,
             "inside_layers_nb": config.agent.inside_layers_nb,

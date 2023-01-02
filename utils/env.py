@@ -16,6 +16,9 @@ from utils.obs.base import BaseObsGenerator
 from utils.reward.base import BaseRewardGenerator
 from utils.log_wrapper import LogWrapper
 
+import matplotlib.pyplot as plt
+import matplotlib
+
 DEFAULT_LOG_PATH = Path("results/logs/")
 
 
@@ -87,7 +90,7 @@ class Env(gym.Env):
         ice_grid = obs["player_0"]["board"]["ice"]
         fac_pos = []
 
-        # 4 kernel to count the number of ice closer than 4 different distances
+        # 4 kernels to count the number of ice closer than 4 different distances
         # (there is not always enough place to only use the most little distance)
         nb_kernels = 4
         ice_scores = []
@@ -156,16 +159,6 @@ class Env(gym.Env):
 
             while len(sorted_poses_per_distance[num_distance]) == 0:
                 num_distance += 1
-
-        # grid_start_pos = np.zeros_like(ice_grid)
-        # for start_pos in fac_pos:
-        #     grid_start_pos[
-        #         start_pos[0] - 1 : start_pos[0] + 2, start_pos[1] - 1 : start_pos[1] + 2
-        #     ] = 1
-        # fig, ax = plt.subplots(1, 2)
-        # ax[0].imshow(ice_grid)
-        # ax[1].imshow(grid_start_pos)
-        # plt.show()
 
         for i in range(n_factories):
             for j, team in enumerate(teams):
@@ -263,6 +256,137 @@ class Env(gym.Env):
     @property
     def env_cfg(self) -> luxai2022.config.EnvConfig:
         return self.env.env_cfg
+
+    def reset_draw(self, **kwargs):
+        nb_game = 7
+        nb_kernels = 4
+        fig, ax = plt.subplots(
+            nb_game, nb_kernels + 3, figsize=(7, 10), sharex=True, sharey=True
+        )
+        for num_row in range(nb_game):
+            for num_col in range(nb_kernels + 3):
+                ax[num_row][num_col].axis("off")
+
+        for num_fig in range(nb_game):
+            obs = self.env.reset(**kwargs)
+
+            # bid phase
+            actions = {
+                "player_0": {"faction": "AlphaStrike", "bid": 0},
+                "player_1": {"faction": "MotherMars", "bid": 0},
+            }
+            self.env.step(actions)
+
+            # factory positionning phase
+
+            n_factories = obs["player_0"]["board"]["factories_per_team"]
+            valid_pos = np.where(obs["player_0"]["board"]["valid_spawns_mask"])
+            n_valid = int(np.sum(obs["player_0"]["board"]["valid_spawns_mask"]))
+            ice_grid = obs["player_0"]["board"]["ice"]
+            fac_pos = []
+
+            # 4 kernels to count the number of ice closer than 4 different distances
+            # (there is not always enough place to only use the most little distance)
+            nb_kernels = 4
+            ice_scores = []
+            ax[num_fig][0].imshow(ice_grid)
+            for k in range(1, nb_kernels + 1):
+                distance = 10 * k + 1
+                kernel = np.zeros((2 * distance, 2 * distance))
+                # put ones where we are closer to the center than distance
+                for i in range(2 * distance):
+                    for j in range(2 * distance):
+                        if np.abs(i - distance) + np.abs(j - distance) < distance:
+                            kernel[i, j] = 1
+                convolute_image = ndimage.convolve(
+                    ice_grid, kernel, mode="constant", cval=0.0
+                )
+                ice_scores.append(convolute_image)
+                ax[num_fig][k].imshow(convolute_image)
+
+            # sort the id with the 4 scores
+            sorted_poses_per_distance = []
+            for num_distance, ice_score in enumerate(ice_scores):
+                pos_ids = list(range(n_valid))
+                pos_ids.sort(
+                    key=lambda pos_id: ice_score[
+                        valid_pos[0][pos_id], valid_pos[1][pos_id]
+                    ],
+                    reverse=True,
+                )
+                for i in range(n_valid):
+                    if num_distance < nb_kernels - 1 and (
+                        ice_score[
+                            valid_pos[0][pos_ids[i]],
+                            valid_pos[1][pos_ids[i]],
+                        ]
+                        < 4
+                    ):
+                        pos_ids = pos_ids[:i]
+                        break
+                sorted_poses_per_distance.append(pos_ids)
+
+            # choose the id for the factories, prioritizing the first distances
+            num_distance = 0
+            while len(fac_pos) < n_factories * 2:
+                pos_id = sorted_poses_per_distance[num_distance][0]
+                fac_pos.append((valid_pos[0][pos_id], valid_pos[1][pos_id]))
+                to_delete_pos_ids = []
+                for remaining_pos_id in sorted_poses_per_distance[-1]:
+                    if (
+                        remaining_pos_id not in to_delete_pos_ids
+                        and np.linalg.norm(
+                            np.array(
+                                [
+                                    valid_pos[0][remaining_pos_id],
+                                    valid_pos[1][remaining_pos_id],
+                                ]
+                            )
+                            - np.array([valid_pos[0][pos_id], valid_pos[1][pos_id]]),
+                            ord=np.inf,
+                        )
+                        < 8
+                    ):
+                        to_delete_pos_ids.append(remaining_pos_id)
+
+                for to_delete_pos_id in to_delete_pos_ids:
+                    for sorted_poses in sorted_poses_per_distance:
+                        if to_delete_pos_id in sorted_poses:
+                            sorted_poses.remove(to_delete_pos_id)
+
+                while len(sorted_poses_per_distance[num_distance]) == 0:
+                    num_distance += 1
+
+            cmap = matplotlib.cm.get_cmap("viridis")
+            ice_grid = ice_grid.astype(float)
+            ice_grid_rgba_img = cmap(ice_grid)
+            ice_grid_rgb_img = np.delete(ice_grid_rgba_img, 3, 2)
+
+            facto_position_img = np.copy(ice_grid_rgb_img)
+            for start_pos in fac_pos:
+                facto_position_img[
+                    start_pos[0] - 1 : start_pos[0] + 2,
+                    start_pos[1] - 1 : start_pos[1] + 2,
+                ] = [1, 0, 0]
+
+            ax[num_fig][nb_kernels + 1].imshow(facto_position_img)
+
+            old_fac_pos = []
+            for i in range(n_factories * 2):
+                pos_id = int(n_valid * (i + 1) / (n_factories * 2 + 1))
+                old_fac_pos.append((valid_pos[0][pos_id], valid_pos[1][pos_id]))
+
+            facto_position_img = np.copy(ice_grid_rgb_img)
+            for start_pos in old_fac_pos:
+                facto_position_img[
+                    start_pos[0] - 1 : start_pos[0] + 2,
+                    start_pos[1] - 1 : start_pos[1] + 2,
+                ] = [1, 0, 0]
+
+            ax[num_fig][nb_kernels + 2].imshow(facto_position_img)
+
+        plt.show()
+        exit()
 
 
 def get_env() -> Env:

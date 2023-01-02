@@ -20,19 +20,14 @@ class ObsHead(nn.Module):
     def __init__(
         self,
         obs_generator: BaseObsGenerator,
-        inside_dim=64,
         grid_kernel_size=11,
         grid_layers_nb=1,
-        vector_post_channel_nb=None,
+        grid_post_channel_nb=32,
+        vector_post_channel_nb=32,
     ):
         super().__init__()
         self.grid_channel_nb = obs_generator.grid_channel_nb
         self.vector_channel_nb = obs_generator.vector_channel_nb
-
-        if vector_post_channel_nb == None:
-            vector_post_channel_nb = self.vector_channel_nb
-
-        self.grid_inside_dim = inside_dim - vector_post_channel_nb
 
         if self.grid_channel_nb == 0:
             print("No grid channel given")
@@ -41,7 +36,7 @@ class ObsHead(nn.Module):
         grid_layers = [
             nn.Conv2d(
                 self.grid_channel_nb,
-                self.grid_inside_dim,
+                grid_post_channel_nb,
                 grid_kernel_size,
                 padding="same",
             ),
@@ -50,8 +45,8 @@ class ObsHead(nn.Module):
         for _ in range(grid_layers_nb - 1):
             grid_layers.append(
                 nn.Conv2d(
-                    self.grid_inside_dim,
-                    self.grid_inside_dim,
+                    grid_post_channel_nb,
+                    grid_post_channel_nb,
                     grid_kernel_size,
                     padding="same",
                 )
@@ -86,10 +81,10 @@ class ConvAgent(BaseAgent):
         self,
         obs_generator: BaseObsGenerator,
         action_handler: BaseActionHandler,
-        inside_dim=64,
         grid_kernel_size=11,
         grid_layers_nb=1,
-        vector_post_channel_nb=None,
+        grid_post_channel_nb=32,
+        vector_post_channel_nb=32,
         inside_kernel_size=1,
         inside_layers_nb=1,
         final_kernel_size=1,
@@ -97,9 +92,11 @@ class ConvAgent(BaseAgent):
     ):
         super().__init__()
 
+        inside_dim = grid_post_channel_nb + vector_post_channel_nb
         self.inside_dim = inside_dim
         self.grid_kernel_size = grid_kernel_size
         self.grid_layers_nb = grid_layers_nb
+        self.grid_post_channel_nb = grid_post_channel_nb
         self.vector_post_channel_nb = vector_post_channel_nb
         self.inside_kernel_size = inside_kernel_size
         self.inside_layers_nb = inside_layers_nb
@@ -110,18 +107,18 @@ class ConvAgent(BaseAgent):
         critic_layers = [
             ObsHead(
                 obs_generator,
-                inside_dim,
                 grid_kernel_size,
                 grid_layers_nb,
+                grid_post_channel_nb,
                 vector_post_channel_nb,
             )
         ]
         actor_layers = [
             ObsHead(
                 obs_generator,
-                inside_dim,
                 grid_kernel_size,
                 grid_layers_nb,
+                grid_post_channel_nb,
                 vector_post_channel_nb,
             )
         ]
