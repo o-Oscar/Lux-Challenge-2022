@@ -18,7 +18,8 @@ def train(args):
     if args.init_save_path is not None:
         agent.load_state_dict(th.load(args.init_save_path))
 
-    if len(bot.reward_update_nbs) > 1:  # case of multi training
+    # Case of Sequential Training (multiple rewards)
+    if len(bot.reward_update_nbs) > 1:
         for i, (reward_generator, reward_update_nb) in enumerate(
             zip(
                 bot.reward_generators[args.skip_rewards :],
@@ -49,6 +50,7 @@ def train(args):
                 gamma=args.gamma,
             )
             start_ppo(config)
+
     else:
         env = Env(
             bot.action,
@@ -77,6 +79,7 @@ def train(args):
 if __name__ == "__main__":
 
     parser = argparse.ArgumentParser()
+
     parser.add_argument(
         "--wandb",
         action="store_true",

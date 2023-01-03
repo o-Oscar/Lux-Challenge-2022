@@ -1,6 +1,6 @@
 import numpy as np
+
 from utils import teams
-import matplotlib.pyplot as plt
 from utils.obs.base import BaseObsGenerator
 
 
@@ -25,28 +25,15 @@ class PositionIceFactoryObsGenerator(BaseObsGenerator):
             self.cargo_space = 100
 
     def calc_obs(self, obs):
-        # pre_computation of the full grid features
+        # Pre_computation of the full grid features
         full_grid = np.zeros((self.channel_nb,) + obs["player_0"]["board"]["ice"].shape)
 
-        # robot positions
+        # Positions of robots
         for i, team in enumerate(teams):
             for unit_name, unit in obs[team]["units"][team].items():
                 full_grid[i, unit["pos"][0], unit["pos"][1]] = 1
 
-        # delta to factories
-        # all_x = np.arange(obs["player_0"]["board"]["ice"].shape[0])
-        # all_y = np.arange(obs["player_0"]["board"]["ice"].shape[1])
-        # all_x, all_y = np.meshgrid(all_x, all_y)
-        # for i, team in enumerate(teams):
-        #     all_deltas = []
-        #     for factory in obs[team]["factories"][team].values():
-        #         cur_delta = np.abs(all_x - factory["pos"][0]) + np.abs(
-        #             all_y - factory["pos"][1]
-        #         )
-        #         all_deltas.append(cur_delta)
-        #     if len(all_deltas) > 0:
-        #         full_grid[2 + i] = np.min(all_deltas, axis=0)
-
+        # Positions of factories
         for i, team in enumerate(teams):
             for factory in obs[team]["factories"][team].values():
                 full_grid[2 + i][
@@ -54,17 +41,17 @@ class PositionIceFactoryObsGenerator(BaseObsGenerator):
                     factory["pos"][1] - 1 : factory["pos"][1] + 2,
                 ] = 1
 
-        # ice
+        # Position of ice
         full_grid[4] = obs["player_0"]["board"]["ice"]
 
-        # robot ice cargot
+        # Personal informations of the robots (for vector observations)
         for i, team in enumerate(teams):
             for unit_name, unit in obs[team]["units"][team].items():
-                # ice fullyness
+                # Ice fullyness
                 if unit["cargo"]["ice"] == self.cargo_space:
                     full_grid[5, unit["pos"][0], unit["pos"][1]] = 1
 
-        # invert the allied/opponent channels
+        # Invert the allied/opponent channels
         second_player_grid = full_grid.copy()
         second_player_grid[0] = full_grid[1]
         second_player_grid[1] = full_grid[0]

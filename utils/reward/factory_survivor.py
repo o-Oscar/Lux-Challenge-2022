@@ -1,4 +1,5 @@
 import numpy as np
+
 from utils import teams
 from utils.reward.base import BaseRewardGenerator
 
@@ -24,11 +25,8 @@ class FactorySurvivorRewardGenerator(BaseRewardGenerator):
         ice = obs["player_0"]["board"]["ice"]
 
         for team in teams:
-            factory_grid = np.zeros(obs["player_0"]["board"]["ice"].shape)
 
-            for factory in obs[team]["factories"][team].values():
-                factory_grid[factory["pos"][0], factory["pos"][1]] = 1
-
+            # Compute the distance to the closest factory (of the team) for each cell
             all_x = np.arange(obs["player_0"]["board"]["ice"].shape[0])
             all_y = np.arange(obs["player_0"]["board"]["ice"].shape[1])
             all_x, all_y = np.meshgrid(all_x, all_y)
@@ -42,18 +40,18 @@ class FactorySurvivorRewardGenerator(BaseRewardGenerator):
             if len(all_deltas) > 0:
                 distance_to_factories = np.min(all_deltas, axis=0)
 
+            # Initialisation of the reward grid
             reward_grid = np.zeros(obs["player_0"]["board"]["ice"].shape)
             reward_grid_monitoring = np.zeros(obs["player_0"]["board"]["ice"].shape)
 
             for unit_id, old_unit in old_obs[team]["units"][team].items():
-
                 cur_reward = 0
                 cur_reward_monitoring = 0
 
-                # is the unit still alive
+                # Is the unit still alive ?
                 if unit_id in obs[team]["units"][team]:
                     unit = obs[team]["units"][team][unit_id]
-                    # is the unit gathering ice and does it have cargo available
+                    # Is the unit gathering ice
                     if (
                         ice[unit["pos"][0], unit["pos"][1]] != 0
                         and unit_id in actions[team]
@@ -61,28 +59,29 @@ class FactorySurvivorRewardGenerator(BaseRewardGenerator):
                             actions[team][unit_id] == np.array([[3, 0, 0, 0, 0]])
                         ).all()
                     ):
+                        # Is it full ?
                         if unit["cargo"]["ice"] < self.cargo_space:
                             cur_reward += GATHER_REWARD
                         else:
                             cur_reward -= GATHER_REWARD
 
-                    # ice cargo
+                    # Ice cargo
                     old_ice_cargo = old_obs[team]["units"][team][unit_id]["cargo"][
                         "ice"
                     ]
                     curr_ice_cargo = unit["cargo"]["ice"]
 
                     if curr_ice_cargo == self.cargo_space:
-                        # is the robot just filled ?
+                        # Is the robot just filled ?
                         if old_ice_cargo < curr_ice_cargo:
                             cur_reward += FULL_REWARD
-                        # distance to the closest factory
+                        # Punishment for being far from a factory
                         cur_reward += (
                             DIST_TO_FACTORY_REWARD
                             * distance_to_factories[unit["pos"][0], unit["pos"][1]]
                         )
 
-                    # did he transfered ice to a factory ?
+                    # Did it transfered ice to a factory ?
                     if (
                         curr_ice_cargo < old_ice_cargo
                         and unit_id in actions[team]
@@ -93,18 +92,6 @@ class FactorySurvivorRewardGenerator(BaseRewardGenerator):
                     ):
                         cur_reward += TRANSFER_REWARD
                         cur_reward_monitoring += 1
-
-                        # print()
-                        # print()
-                        # print("#" * len("WE DID IT !"))
-                        # print(
-                        #     "WE DID IT ! ("
-                        #     + str(obs[team]["real_env_steps"])
-                        #     + "th step)"
-                        # )
-                        # print("#" * len("WE DID IT !"))
-                        # print()
-                        # print()
 
                 reward_grid[old_unit["pos"][0], old_unit["pos"][1]] = cur_reward
                 reward_grid_monitoring[

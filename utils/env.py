@@ -1,23 +1,22 @@
 import gym
-from gym import spaces
 import numpy as np
 from scipy import ndimage
-import luxai2022
-from luxai_runner.utils import to_json
 from pathlib import Path
-import json
-import pickle
-import time
+import matplotlib.pyplot as plt
+import matplotlib
+
+import luxai2022
 import luxai2022.config
 import luxai2022.state
+from luxai_runner.utils import to_json
+
 from utils import teams
 from utils.action.base import BaseActionHandler
 from utils.obs.base import BaseObsGenerator
 from utils.reward.base import BaseRewardGenerator
 from utils.log_wrapper import LogWrapper
 
-import matplotlib.pyplot as plt
-import matplotlib
+
 
 DEFAULT_LOG_PATH = Path("results/logs/")
 
@@ -35,6 +34,7 @@ class Env(gym.Env):
     ):
         robots = luxai2022.config.EnvConfig().ROBOTS
 
+        # Cancel all power cost
         if not power_cost:
             robots["LIGHT"].MOVE_COST = 0
             robots["LIGHT"].DIG_COST = 0
@@ -75,14 +75,14 @@ class Env(gym.Env):
 
         obs = self.env.reset(**kwargs)
 
-        # bid phase
+        # Bid phase
         actions = {
             "player_0": {"faction": "AlphaStrike", "bid": 0},
             "player_1": {"faction": "MotherMars", "bid": 0},
         }
         self.env.step(actions)
 
-        # factory positionning phase
+        # Factory positionning phase
 
         n_factories = obs["player_0"]["board"]["factories_per_team"]
         valid_pos = np.where(obs["player_0"]["board"]["valid_spawns_mask"])
@@ -97,7 +97,7 @@ class Env(gym.Env):
         for k in range(1, nb_kernels + 1):
             distance = 10 * k + 1
             kernel = np.zeros((2 * distance, 2 * distance))
-            # put ones where we are closer to the center than distance
+            # Put ones where we are closer to the center than distance
             for i in range(2 * distance):
                 for j in range(2 * distance):
                     if np.abs(i - distance) + np.abs(j - distance) < distance:
@@ -107,7 +107,7 @@ class Env(gym.Env):
             )
             ice_scores.append(convolute_image)
 
-        # sort the id with the 4 scores
+        # Sort the id with the 4 scores
         sorted_poses_per_distance = []
         for num_distance, ice_score in enumerate(ice_scores):
             pos_ids = list(range(n_valid))
@@ -129,7 +129,7 @@ class Env(gym.Env):
                     break
             sorted_poses_per_distance.append(pos_ids)
 
-        # choose the id for the factories, prioritizing the first distances
+        # Choose the pos_id for the factories, prioritizing the lower distances
         num_distance = 0
         while len(fac_pos) < n_factories * 2:
             pos_id = sorted_poses_per_distance[num_distance][0]
@@ -148,7 +148,7 @@ class Env(gym.Env):
                         - np.array([valid_pos[0][pos_id], valid_pos[1][pos_id]]),
                         ord=np.inf,
                     )
-                    < 8
+                    < 8  # Two factories can't be too close
                 ):
                     to_delete_pos_ids.append(remaining_pos_id)
 
@@ -163,12 +163,6 @@ class Env(gym.Env):
         for i in range(n_factories):
             for j, team in enumerate(teams):
                 actions = {t: {} for t in teams}
-                # [print(k) for k, v in obs[team]["board"].items()]
-                # import matplotlib.pyplot as plt
-
-                # plt.imshow(obs[team]["board"]["valid_spawns_mask"])
-                # plt.show()
-                # exit()
                 actions[team] = {
                     "spawn": list(fac_pos[2 * i + j]),
                     "metal": self.env.env_cfg.INIT_WATER_METAL_PER_FACTORY,
@@ -176,10 +170,6 @@ class Env(gym.Env):
                 }
                 self.env.step(actions)
 
-        # one more turn of factory placement
-        # self.env.step({"player_0": {}, "player_1": {}})
-
-        # turn 0 : creating robots for each team
         obs, rewards, dones, infos = self.env.step(self.factory_actions())
 
         unit_obs = self.obs_generator.calc_obs(obs)
@@ -277,7 +267,7 @@ class Env(gym.Env):
             }
             self.env.step(actions)
 
-            # factory positionning phase
+            # Factory positionning phase
 
             n_factories = obs["player_0"]["board"]["factories_per_team"]
             valid_pos = np.where(obs["player_0"]["board"]["valid_spawns_mask"])
@@ -293,7 +283,7 @@ class Env(gym.Env):
             for k in range(1, nb_kernels + 1):
                 distance = 10 * k + 1
                 kernel = np.zeros((2 * distance, 2 * distance))
-                # put ones where we are closer to the center than distance
+                # Put ones where we are closer to the center than distance
                 for i in range(2 * distance):
                     for j in range(2 * distance):
                         if np.abs(i - distance) + np.abs(j - distance) < distance:
@@ -304,7 +294,7 @@ class Env(gym.Env):
                 ice_scores.append(convolute_image)
                 ax[num_fig][k].imshow(convolute_image)
 
-            # sort the id with the 4 scores
+            # Sort the id with the 4 scores
             sorted_poses_per_distance = []
             for num_distance, ice_score in enumerate(ice_scores):
                 pos_ids = list(range(n_valid))
@@ -326,7 +316,7 @@ class Env(gym.Env):
                         break
                 sorted_poses_per_distance.append(pos_ids)
 
-            # choose the id for the factories, prioritizing the first distances
+            # Choose the pos_id for the factories, prioritizing the lower distances
             num_distance = 0
             while len(fac_pos) < n_factories * 2:
                 pos_id = sorted_poses_per_distance[num_distance][0]
@@ -345,7 +335,7 @@ class Env(gym.Env):
                             - np.array([valid_pos[0][pos_id], valid_pos[1][pos_id]]),
                             ord=np.inf,
                         )
-                        < 8
+                        < 8  # Two factories can't be too close
                     ):
                         to_delete_pos_ids.append(remaining_pos_id)
 
@@ -357,6 +347,7 @@ class Env(gym.Env):
                 while len(sorted_poses_per_distance[num_distance]) == 0:
                     num_distance += 1
 
+            # Matplotlib things to have a nice print
             cmap = matplotlib.cm.get_cmap("viridis")
             ice_grid = ice_grid.astype(float)
             ice_grid_rgba_img = cmap(ice_grid)

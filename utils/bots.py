@@ -44,6 +44,21 @@ class Bot:
             self.reward_update_nbs = [5]
 
         # FACTORY SURVIVOR
+        elif bot_type == "factory_survivor_super_light":
+            self.action = HarvestTransferActionHandler()
+            self.obs_generator = PositionIceFactoryObsGenerator()
+            self.agent = ConvAgent(
+                self.obs_generator,
+                self.action,
+                grid_kernel_size=11,
+                vector_post_channel_nb=vec_chan,
+                inside_layers_nb=0,
+                final_kernel_size=5,
+                final_layers_nb=1,
+            )
+            self.reward_generators = [FactorySurvivorRewardGenerator()]
+            self.reward_update_nbs = [10000]
+
         elif bot_type == "factory_survivor_light":
             self.action = HarvestTransferActionHandler()
             self.obs_generator = PositionIceFactoryObsGenerator()
@@ -67,14 +82,16 @@ class Bot:
                 self.action,
                 grid_kernel_size=21,
                 vector_post_channel_nb=vec_chan,
-                inside_layers_nb=2,  # difference with light
+                inside_layers_nb=1,  # difference with light
                 final_kernel_size=5,
                 final_layers_nb=1,
             )
             self.reward_generators = [FactorySurvivorRewardGenerator()]
             self.reward_update_nbs = [10000]
 
-        # DEPRECIATED BECAUSE OF REWARD NOT GIVING MONITORING REWARD.
+        ##################################################################################################
+        ############## DEPRECIATED BECAUSE OF REWARD_GENERATOR NOT GIVING MONITORING REWARD ##############
+        ##################################################################################################
 
         # THIRSTY
         elif bot_type == "thirsty_FK1_FL1":

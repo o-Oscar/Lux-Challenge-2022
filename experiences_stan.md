@@ -48,3 +48,5 @@ Consernant les résultat finaux : les robots se répartissent globalement sur le
 - cependant quelques parties de 1000 tours(enfin on prends toujours pas en compte le power...)
 
 ## EXP 7
+
+PAS TENU à JOUR

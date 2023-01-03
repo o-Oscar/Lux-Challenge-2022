@@ -18,12 +18,12 @@ class HarvestTransferActionHandler(BaseActionHandler):
 
         self.robot_to_env_actions = [
             None,  # ne rien faire
-            np.array([[0, 1, 0, 0, 0]]),  # bouger en haut
-            np.array([[0, 2, 0, 0, 0]]),  # bouger à droite
-            np.array([[0, 3, 0, 0, 0]]),  # bouger en bas
-            np.array([[0, 4, 0, 0, 0]]),  # bouger à gauche
-            np.array([[1, 0, 0, self.cargo_space, 0]]),  # transférer de la glace
-            np.array([[3, 0, 0, 0, 0]]),  # creuser
+            np.array([[0, 1, 0, 0, 0]]),  # move north
+            np.array([[0, 2, 0, 0, 0]]),  # move east
+            np.array([[0, 3, 0, 0, 0]]),  # move south
+            np.array([[0, 4, 0, 0, 0]]),  # move west
+            np.array([[1, 0, 0, self.cargo_space, 0]]),  # transfer ice
+            np.array([[3, 0, 0, 0, 0]]),  # dig
         ]
 
         self.action_nb = len(self.robot_to_env_actions)

@@ -1,20 +1,15 @@
-import argparse
 import dataclasses
-import itertools
-import os
-import random
 import time
+
 from distutils.util import strtobool
 from pathlib import Path
-
-import gym
 import numpy as np
+import wandb
+
 import torch as th
 import torch.nn as nn
 import torch.optim as optim
-from torch.distributions.categorical import Categorical
 
-import wandb
 from utils import teams
 from utils.env import Env, get_env
 from utils.agent.base import BaseAgent
@@ -89,30 +84,18 @@ def multi_agent_rollout(
 
     for t in range(max_ep_len):
         network_obs = obs_to_network(obs, device)
-
-        # if t == 0:
-        #     # print(th.sum(th.tensor(obs[teams[0]], device=device, dtype=th.float32)))
-        #     print(th.where(th.tensor(masks[teams[0]], device=device, dtype=th.float32)))
-
         network_masks = mask_to_network(masks, device)
         actions, log_prob, _, value = agent.get_action(network_obs, network_masks)
         actions = actions_to_env(actions, obs)
         log_prob = actions_to_env(log_prob, obs)
         value = actions_to_env(value, obs)
 
-        # if network_obs["grid"].shape[0] > 0:
-        #
-        # else:
-        #     actions = {team: {} for team in teams}
-        #     log_prob = {team: {} for team in teams}
-        #     value = {team: {} for team in teams}
         for team in teams:
             value[team] = value[team].detach().cpu()
             actions[team] = actions[team].detach().cpu()
             log_prob[team] = log_prob[team].detach().cpu()
 
         obs, rewards, rewards_monotoring, masks, done, unit_pos = env.step(actions)
-        # print(np.min(rewards[teams[0]]), np.max(rewards[teams[0]]))
 
         all_values.append(value)
 
@@ -128,10 +111,6 @@ def multi_agent_rollout(
         all_nb_factories.append(n_factories)
 
     env.save(full_save=False, convenient_save=True, replay_name=replay_name)
-    # exit()
-    # if no_unit:
-    #     print("no units !!")
-    #     exit()
 
     return {
         "obs": all_obs,
@@ -237,53 +216,15 @@ class ReplayBuffer:
         self.all_gae = []
         for game_id in range(len(self.all_advantages)):
             gae = self.all_advantages[game_id][-1]
-            # gae = gae * 0
             cur_gae = [gae]
             for t in reversed(range(len(self.all_advantages[game_id]) - 1)):
                 robot_pos = self.all_unit_pos[game_id][t]
                 next_robot_pos = self.all_unit_pos[game_id][t + 1]
                 gae = map_robots_grid(robot_pos, next_robot_pos, gae)
                 gae = self.all_advantages[game_id][t] + self.gamma * self.lamb * gae
-                # gae = gae * 0
                 cur_gae.append(gae)
 
             self.all_gae.append(list(reversed(cur_gae)))
-
-        # game_id = 0
-        # r_id = list(self.all_unit_pos[game_id][0].keys())[0]
-        # print(r_id)
-        # for t in range(len(self.all_unit_pos[game_id])):
-        #     robot_pos = self.all_unit_pos[game_id][t]
-        #     for robot_id, cur_pos in robot_pos.items():
-        #         if robot_id == r_id:
-
-        #             gae = self.all_gae[game_id][t]
-        #             value = self.all_values[game_id][t]
-        #             reward = self.all_rewards[game_id][t]
-        #             advantage = self.all_advantages[game_id][t]
-
-        #             print(
-        #                 t,
-        #                 gae[cur_pos[1], cur_pos[0]].item(),
-        #                 advantage[cur_pos[1], cur_pos[0]].item(),
-        #                 value[cur_pos[1], cur_pos[0]].item(),
-        #                 reward[cur_pos[1], cur_pos[0]].item(),
-        #                 (cur_pos[1], cur_pos[0]),
-        #             )
-        # exit()
-
-        # print(
-        #     len(self.all_obs[game_id]),
-        #     len(self.all_actions[game_id]),
-        #     len(self.all_rewards[game_id]),
-        #     len(self.all_masks[game_id]),
-        #     len(self.all_logprob[game_id]),
-        #     len(self.all_values[game_id]),
-        #     len(self.all_unit_pos[game_id]),
-        #     len(self.all_advantages[game_id]),
-        #     len(self.all_gae[game_id]),
-        # )
-        # exit()
 
     def __len__(self):
         return sum([len(x) for x in self.all_actions])
@@ -319,9 +260,6 @@ class ReplayBuffer:
             )
             ret_nb_factories.append(self.all_nb_factories[id[0]][id[1]])
 
-        # print(ret_actions)
-        # print(ret_gae[0])
-
         ret_obs = np.stack(ret_obs)
         ret_masks = np.stack(ret_masks)
         ret_nb_factories = np.stack(ret_nb_factories)
@@ -333,15 +271,6 @@ class ReplayBuffer:
         ret_masks = th.tensor(ret_masks, dtype=th.float32)
         ret_returns = th.stack(ret_returns).detach()
         ret_nb_factories = th.tensor(ret_nb_factories)
-
-        # print("shapes")
-        # print(ret_obs.shape)
-        # print(ret_actions.shape)
-        # print(ret_logprob.shape)
-        # print(ret_gae.shape)
-        # print(ret_masks.shape)
-        # print(ret_returns.shape)
-        # exit()
 
         return (
             ret_obs,
@@ -527,8 +456,7 @@ def start_ppo(config: PPOConfig):
                 explained_variance.update(explained_var, n)
                 mean_ratio.update(m_mean(ratio, robot_mask), n)
 
-        to_log = {}
-        # mean reward computation
+        # Mean rewards computation
         mean_rew = 0
         mean_rew_monitoring = 0
         for rew, rew_monitoring, mask, nb_factories in zip(
@@ -547,6 +475,7 @@ def start_ppo(config: PPOConfig):
             )
 
         # logging
+        to_log = {}
         to_log["main/mean_reward"] = mean_rew
         to_log["main/mean_reward_monitoring"] = mean_rew_monitoring
         to_log["main/value_loss"] = value_loss.value

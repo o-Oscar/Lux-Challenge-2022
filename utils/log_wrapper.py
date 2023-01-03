@@ -1,6 +1,4 @@
 import gym
-from gym import spaces
-import numpy as np
 
 import luxai2022
 from luxai_runner.utils import to_json
@@ -19,15 +17,13 @@ class LogWrapper(gym.Wrapper):
     def __init__(self, env: luxai2022.LuxAI2022, log_path=DEFAULT_LOG_PATH):
         self.env = env
         self.log_path = log_path
-
-        self.action_space = spaces.Discrete(6)
-
         self.compressed_log = {}
         self.full_log = {}
 
     def step(self, action):
         obs, rewards, dones, infos = self.env.step(action)
         change_obs = self.env.state.get_change_obs(self.state_obs)
+
         self.state_obs = obs["player_0"]
 
         self.compressed_log["observations"].append(change_obs)

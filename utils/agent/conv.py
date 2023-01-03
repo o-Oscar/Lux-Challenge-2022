@@ -103,7 +103,7 @@ class ConvAgent(BaseAgent):
         self.final_kernel_size = final_kernel_size
         self.final_layers_nb = final_layers_nb
 
-        # Obs Layers
+        # Observation Head
         critic_layers = [
             ObsHead(
                 obs_generator,
@@ -123,7 +123,7 @@ class ConvAgent(BaseAgent):
             )
         ]
 
-        # Inside Layers
+        # Inside Network
         for _ in range(inside_layers_nb):
             critic_layers.append(
                 layer_init(
@@ -143,7 +143,7 @@ class ConvAgent(BaseAgent):
             )
             actor_layers.append(nn.Tanh())
 
-        # Final Layers
+        # Final Network
         critic_layers.append(
             layer_init(
                 nn.Conv2d(inside_dim, 1, final_kernel_size, padding="same"), std=1.0
