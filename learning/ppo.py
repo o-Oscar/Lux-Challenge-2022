@@ -22,6 +22,7 @@ class PPOConfig:
     save_path: Path
     device: th.device
     wandb: bool = False
+    run_id: str = None
     name: str = "default"
     epoch_per_save: int = 0
     min_batch_size: int = 32
@@ -313,14 +314,18 @@ def m_var(array, mask):
 
 def start_ppo(config: PPOConfig):
 
+    last_save_epoch = 0
     if config.epoch_per_save > 0:
         if not (config.save_path.is_dir()):
             config.save_path.mkdir(exist_ok=False, parents=True)
 
         if any(config.save_path.iterdir()):
-            raise NameError(
-                "Save folder already exists and is not empty. Default is to not override"
-            )
+            if config.run_id is None:
+                raise NameError(
+                    "Save folder already exists and is not empty. Default is to not override"
+                )
+            else:
+                last_save_epoch = int(list(sorted(config.save_path.glob("*")))[-1].name)
 
     if config.wandb:
         wandb_config = {
@@ -336,7 +341,20 @@ def start_ppo(config: PPOConfig):
             "batch_size": config.min_batch_size,
             "learning_batch_size": config.learning_batch_size,
         }
-        wandb.init(project="lux_ai_ppo", name=config.name, config=wandb_config)
+        if config.run_id is not None:
+            wandb.init(
+                project="lux_ai_ppo",
+                name=config.name,
+                config=wandb_config,
+                id=config.run_id,
+                resume="must",
+            )
+        else:
+            wandb.init(
+                project="lux_ai_ppo",
+                name=config.name,
+                config=wandb_config,
+            )
 
     env = config.env
 
@@ -359,7 +377,7 @@ def start_ppo(config: PPOConfig):
     mean_ratio = MeanLogger()
     mean_reward = MeanLogger()
 
-    for update in range(config.update_nb):
+    for update in range(last_save_epoch + config.update_nb):
 
         start_time = time.time()
         print("Update {} | Trajs computation ".format(update), end="", flush=True)

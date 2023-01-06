@@ -1,10 +1,13 @@
 import argparse
 from pathlib import Path
 
+import numpy as np
 import torch as th
 
 from utils.bots import Bot
 from utils.env import Env
+from utils import teams
+import tqdm
 
 from learning.ppo import multi_agent_rollout
 
@@ -15,7 +18,12 @@ def evaluate(args):
     bot = Bot(args.bot_type, args.vec_chan)
     agent = bot.agent
 
-    env = Env(bot.action, bot.obs_generator, bot.reward_generators[-1])
+    env = Env(
+        bot.action,
+        bot.obs_generator,
+        bot.reward_generators[-1],
+        water_consumption=args.water_consumption,
+    )
 
     if len(bot.reward_update_nbs) > 1:
         if args.num_reward == -1:
@@ -35,7 +43,22 @@ def evaluate(args):
     agent.to(device)
     agent.eval()
 
-    multi_agent_rollout(env, agent, device, replay_name=replay_name)
+    mean_reward = 0
+    for _ in tqdm.trange(args.num_games):
+        res_game = multi_agent_rollout(
+            env, agent, device, replay_name=replay_name, max_ep_len=args.max_length
+        )
+        for turn in range(len(res_game["rewards_monitoring"])):
+            nb_factories = res_game["nb_factories"][turn]
+            for team in teams:
+                m = res_game["masks"][turn][team]
+                m = np.max(m, axis=0)
+                r = res_game["rewards_monitoring"][turn][team]
+
+                mean_reward += (
+                    np.sum(m * r) / nb_factories / len(teams) / args.num_games
+                )
+    print("Mean transfer per factory and per game :", mean_reward)
 
 
 if __name__ == "__main__":
@@ -67,6 +90,27 @@ if __name__ == "__main__":
         "--num_reward",
         type=int,
         default=-1,
+        help="Number of the reward to evaluate for this bot",
+    )
+
+    parser.add_argument(
+        "--water_consumption",
+        type=int,
+        default=0,
+        help="Water consumption of factories",
+    )
+
+    parser.add_argument(
+        "--max_length",
+        type=int,
+        default=1000,
+        help="Max length of a game",
+    )
+
+    parser.add_argument(
+        "--num_games",
+        type=int,
+        default=1,
         help="Number of the reward to evaluate for this bot",
     )
 

@@ -24,6 +24,7 @@ class ObsHead(nn.Module):
         grid_layers_nb=1,
         grid_post_channel_nb=32,
         vector_post_channel_nb=32,
+        use_relu=False,
     ):
         super().__init__()
         self.grid_channel_nb = obs_generator.grid_channel_nb
@@ -40,9 +41,14 @@ class ObsHead(nn.Module):
                 grid_kernel_size,
                 padding="same",
             ),
-            nn.Tanh(),
         ]
+
         for _ in range(grid_layers_nb - 1):
+            if use_relu:
+                grid_layers.append(nn.ReLU())
+            else:
+                grid_layers.append(nn.Tanh())
+
             grid_layers.append(
                 nn.Conv2d(
                     grid_post_channel_nb,
@@ -51,8 +57,7 @@ class ObsHead(nn.Module):
                     padding="same",
                 )
             )
-            grid_layers.append(nn.Tanh())
-        grid_layers.pop()
+
         self.grid_head = nn.Sequential(*grid_layers)
 
         if self.vector_channel_nb > 0:
@@ -89,6 +94,7 @@ class ConvAgent(BaseAgent):
         inside_layers_nb=1,
         final_kernel_size=1,
         final_layers_nb=1,
+        use_relu=False,
     ):
         super().__init__()
 
@@ -102,6 +108,7 @@ class ConvAgent(BaseAgent):
         self.inside_layers_nb = inside_layers_nb
         self.final_kernel_size = final_kernel_size
         self.final_layers_nb = final_layers_nb
+        self.use_relu = use_relu
 
         # Observation Head
         critic_layers = [
@@ -111,6 +118,7 @@ class ConvAgent(BaseAgent):
                 grid_layers_nb,
                 grid_post_channel_nb,
                 vector_post_channel_nb,
+                use_relu,
             )
         ]
         actor_layers = [
@@ -120,6 +128,7 @@ class ConvAgent(BaseAgent):
                 grid_layers_nb,
                 grid_post_channel_nb,
                 vector_post_channel_nb,
+                use_relu,
             )
         ]
 
@@ -132,7 +141,10 @@ class ConvAgent(BaseAgent):
                     )
                 )
             )
-            critic_layers.append(nn.Tanh())
+            if use_relu:
+                critic_layers.append(nn.ReLU())
+            else:
+                critic_layers.append(nn.Tanh())
 
             actor_layers.append(
                 layer_init(
@@ -141,7 +153,10 @@ class ConvAgent(BaseAgent):
                     )
                 )
             )
-            actor_layers.append(nn.Tanh())
+            if use_relu:
+                actor_layers.append(nn.ReLU())
+            else:
+                actor_layers.append(nn.Tanh())
 
         # Final Network
         critic_layers.append(
@@ -162,12 +177,18 @@ class ConvAgent(BaseAgent):
         )
 
         for _ in range(final_layers_nb - 1):
-            critic_layers.append(nn.Tanh())
+            if use_relu:
+                critic_layers.append(nn.ReLU())
+            else:
+                critic_layers.append(nn.Tanh())
             critic_layers.append(
                 layer_init(nn.Conv2d(1, 1, final_kernel_size, padding="same"))
             )
 
-            actor_layers.append(nn.Tanh())
+            if use_relu:
+                actor_layers.append(nn.ReLU())
+            else:
+                actor_layers.append(nn.Tanh())
             actor_layers.append(
                 layer_init(
                     nn.Conv2d(

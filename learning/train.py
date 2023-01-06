@@ -12,7 +12,7 @@ from learning.ppo import PPOConfig, start_ppo
 def train(args):
     device = th.device("cuda" if th.cuda.is_available() else "cpu")
 
-    bot = Bot(args.bot_type, args.vec_chan)
+    bot = Bot(args.bot_type, args.vec_chan, args.use_relu)
     agent = bot.agent
 
     if args.init_save_path is not None:
@@ -42,6 +42,7 @@ def train(args):
                 / ((args.name) + "_rew_" + str(i + 1 + args.skip_rewards)),
                 name=args.bot_type + "_" + args.name,
                 wandb=args.wandb,
+                run_id=args.run_id,
                 epoch_per_save=args.epoch_per_save,
                 device=device,
                 min_batch_size=args.min_batch_size,
@@ -66,6 +67,7 @@ def train(args):
             save_path=Path("results") / args.bot_type / (args.name),
             name=args.bot_type + "_" + args.name,
             wandb=args.wandb,
+            run_id=args.run_id,
             epoch_per_save=args.epoch_per_save,
             device=device,
             min_batch_size=args.min_batch_size,
@@ -87,6 +89,13 @@ if __name__ == "__main__":
     )
 
     parser.add_argument(
+        "--run_id",
+        type=str,
+        default=None,
+        help="Wandb run id to retake training",
+    )
+
+    parser.add_argument(
         "--bot_type",
         type=str,
         default="default",
@@ -98,6 +107,14 @@ if __name__ == "__main__":
         type=int,
         default=32,
         help="Number of output channels for the vector Obs Head",
+    )
+
+    parser.add_argument(
+        "--use_relu",
+        type=bool,
+        action=argparse.BooleanOptionalAction,
+        default=False,
+        help="Wether to use a ReLU or not",
     )
 
     parser.add_argument(

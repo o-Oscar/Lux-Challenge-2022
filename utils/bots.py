@@ -17,6 +17,7 @@ from utils.reward.survivor_move import SurvivorMoveRewardGenerator
 from utils.reward.survivor_dance import SurvivorDanceRewardGenerator
 from utils.reward.thirsty import ThirstyRewardGenerator
 from utils.reward.factory_survivor import FactorySurvivorRewardGenerator
+from utils.reward.imitation import ImitationRewardGenerator
 
 
 class Bot:
@@ -26,7 +27,7 @@ class Bot:
     reward_generators: list
     reward_update_nbs: list  # limits of step for each reward (sequential learning)
 
-    def __init__(self, bot_type: str, vec_chan: int):
+    def __init__(self, bot_type: str, vec_chan: int, use_relu: bool = False):
 
         # TEST
         if bot_type == "test":
@@ -39,9 +40,27 @@ class Bot:
                 inside_layers_nb=0,
                 final_kernel_size=1,
                 final_layers_nb=1,
+                use_relu=use_relu,
             )
             self.reward_generators = [FactorySurvivorRewardGenerator()]
             self.reward_update_nbs = [5]
+
+        # IMITATOR
+        elif bot_type == "imitator_light":
+            self.action = HarvestTransferActionHandler()
+            self.obs_generator = PositionIceFactoryObsGenerator()
+            self.agent = ConvAgent(
+                self.obs_generator,
+                self.action,
+                grid_kernel_size=21,
+                vector_post_channel_nb=vec_chan,
+                inside_layers_nb=0,
+                final_kernel_size=5,
+                final_layers_nb=1,
+                use_relu=use_relu,
+            )
+            self.reward_generators = [ImitationRewardGenerator()]
+            self.reward_update_nbs = [10000]
 
         # FACTORY SURVIVOR
         elif bot_type == "factory_survivor_super_light":
@@ -50,11 +69,12 @@ class Bot:
             self.agent = ConvAgent(
                 self.obs_generator,
                 self.action,
-                grid_kernel_size=11,
+                grid_kernel_size=11,  # difference with light
                 vector_post_channel_nb=vec_chan,
                 inside_layers_nb=0,
                 final_kernel_size=5,
                 final_layers_nb=1,
+                use_relu=use_relu,
             )
             self.reward_generators = [FactorySurvivorRewardGenerator()]
             self.reward_update_nbs = [10000]
@@ -70,6 +90,7 @@ class Bot:
                 inside_layers_nb=0,
                 final_kernel_size=5,
                 final_layers_nb=1,
+                use_relu=use_relu,
             )
             self.reward_generators = [FactorySurvivorRewardGenerator()]
             self.reward_update_nbs = [10000]
@@ -85,6 +106,7 @@ class Bot:
                 inside_layers_nb=1,  # difference with light
                 final_kernel_size=5,
                 final_layers_nb=1,
+                use_relu=use_relu,
             )
             self.reward_generators = [FactorySurvivorRewardGenerator()]
             self.reward_update_nbs = [10000]
