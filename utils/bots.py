@@ -45,70 +45,49 @@ class Bot:
             self.reward_generators = [FactorySurvivorRewardGenerator()]
             self.reward_update_nbs = [5]
 
-        # IMITATOR
-        elif bot_type == "imitator_light":
-            self.action = HarvestTransferActionHandler()
-            self.obs_generator = PositionIceFactoryObsGenerator()
-            self.agent = ConvAgent(
-                self.obs_generator,
-                self.action,
-                grid_kernel_size=21,
-                vector_post_channel_nb=vec_chan,
-                inside_layers_nb=0,
-                final_kernel_size=5,
-                final_layers_nb=1,
-                use_relu=use_relu,
-            )
-            self.reward_generators = [ImitationRewardGenerator()]
-            self.reward_update_nbs = [10000]
+        # LIGHT BOTS
+        elif "light" in bot_type:
+            if "imitator" in bot_type:
+                print()
+                print(
+                    "imitator detected, set reward_generator to ImitationRewardGenerator"
+                )
+                reward_generators = [ImitationRewardGenerator()]
+            elif "factory_survivor" in bot_type:
+                print(
+                    "factory_survivor detected, set reward_generator to FactorySurvivorRewardGenerator"
+                )
+                reward_generators = [FactorySurvivorRewardGenerator()]
+            else:
+                raise NameError("No known reward generator")
 
-        # FACTORY SURVIVOR
-        elif bot_type == "factory_survivor_super_light":
-            self.action = HarvestTransferActionHandler()
-            self.obs_generator = PositionIceFactoryObsGenerator()
-            self.agent = ConvAgent(
-                self.obs_generator,
-                self.action,
-                grid_kernel_size=11,  # difference with light
-                vector_post_channel_nb=vec_chan,
-                inside_layers_nb=0,
-                final_kernel_size=5,
-                final_layers_nb=1,
-                use_relu=use_relu,
-            )
-            self.reward_generators = [FactorySurvivorRewardGenerator()]
-            self.reward_update_nbs = [10000]
+            if "super_light" in bot_type:
+                print()
+                print("super_light detected, change grid_kernel_size to 11")
+                grid_kernel_size = 11
+            else:
+                grid_kernel_size = 21
+            if "light_deep" in bot_type:
+                print()
+                print("light_deep detected, change inside_layers_nb to 1")
+                inside_layers_nb = 1
+            else:
+                inside_layers_nb = 0
+            print()
 
-        elif bot_type == "factory_survivor_light":
             self.action = HarvestTransferActionHandler()
             self.obs_generator = PositionIceFactoryObsGenerator()
             self.agent = ConvAgent(
                 self.obs_generator,
                 self.action,
-                grid_kernel_size=21,
+                grid_kernel_size=grid_kernel_size,
                 vector_post_channel_nb=vec_chan,
-                inside_layers_nb=0,
+                inside_layers_nb=inside_layers_nb,
                 final_kernel_size=5,
                 final_layers_nb=1,
                 use_relu=use_relu,
             )
-            self.reward_generators = [FactorySurvivorRewardGenerator()]
-            self.reward_update_nbs = [10000]
-
-        elif bot_type == "factory_survivor_big":
-            self.action = HarvestTransferActionHandler()
-            self.obs_generator = PositionIceFactoryObsGenerator()
-            self.agent = ConvAgent(
-                self.obs_generator,
-                self.action,
-                grid_kernel_size=21,
-                vector_post_channel_nb=vec_chan,
-                inside_layers_nb=1,  # difference with light
-                final_kernel_size=5,
-                final_layers_nb=1,
-                use_relu=use_relu,
-            )
-            self.reward_generators = [FactorySurvivorRewardGenerator()]
+            self.reward_generators = reward_generators
             self.reward_update_nbs = [10000]
 
         ##################################################################################################

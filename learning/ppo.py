@@ -325,7 +325,9 @@ def start_ppo(config: PPOConfig):
                     "Save folder already exists and is not empty. Default is to not override"
                 )
             else:
-                last_save_epoch = int(list(sorted(config.save_path.glob("*")))[-1].name)
+                last_save_epoch = (
+                    int(list(sorted(config.save_path.glob("*")))[-1].name) + 1
+                )
 
     if config.wandb:
         wandb_config = {
@@ -377,7 +379,7 @@ def start_ppo(config: PPOConfig):
     mean_ratio = MeanLogger()
     mean_reward = MeanLogger()
 
-    for update in range(last_save_epoch + config.update_nb):
+    for update in range(last_save_epoch, last_save_epoch + config.update_nb):
 
         start_time = time.time()
         print("Update {} | Trajs computation ".format(update), end="", flush=True)
