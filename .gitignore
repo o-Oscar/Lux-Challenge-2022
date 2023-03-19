@@ -13,10 +13,12 @@ viewer/
 wandb/
 results/
 old_results/
+light_results/
+
 replays/
 clean_replays/
 old_replays/
-light_results/
+presentation_replays/
 
 replay*
 
